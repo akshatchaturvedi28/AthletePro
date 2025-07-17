@@ -8,6 +8,17 @@ ACrossFit is a modern CrossFit community management platform that combines AI-po
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**July 15, 2025 - Authentication System Fixed**
+- Fixed authentication loop issue that was preventing application from loading
+- Updated useAuth hook to properly handle 401 responses for unauthenticated users
+- Fixed database query errors in storage layer for community workout logs
+- Resolved TypeScript compilation errors with user membership types
+- Application now properly displays landing page for unauthenticated users
+- Login flow tested and working with session storage in PostgreSQL
+- All core features functional: workout logging, progress tracking, leaderboards
+
 ## System Architecture
 
 ### Frontend Architecture
