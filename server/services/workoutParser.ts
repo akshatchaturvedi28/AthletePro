@@ -45,13 +45,74 @@ export class WorkoutParser {
     'michael', 'jt', 'danny', 'jason', 'adam', 'brad', 'chad', 'christopher'
   ];
 
-  static parseWorkout(rawText: string): ParsedWorkout {
+  static parseWorkout(rawText: string): ParsedWorkout[] {
     const lines = rawText.trim().split('\n').map(line => line.trim()).filter(line => line);
     
     if (lines.length === 0) {
       throw new Error('No workout content provided');
     }
 
+    // Split WOD into multiple workout entities
+    const workoutEntities = this.splitIntoWorkoutEntities(lines);
+    
+    return workoutEntities.map(entity => this.parseWorkoutEntity(entity));
+  }
+
+  private static splitIntoWorkoutEntities(lines: string[]): string[][] {
+    const workoutEntities: string[][] = [];
+    let currentEntity: string[] = [];
+    
+    const workoutSeparators = [
+      'workout a:', 'workout b:', 'workout c:', 'workout d:',
+      'wod a:', 'wod b:', 'wod c:', 'wod d:',
+      'part a:', 'part b:', 'part c:', 'part d:',
+      'round 1:', 'round 2:', 'round 3:', 'round 4:',
+      'strength:', 'metcon:', 'conditioning:', 'warm-up:', 'cool-down:',
+      'amrap:', 'for time:', 'emom:', 'tabata:',
+      'then:', 'followed by:', 'next:', 'also:',
+      '---', '***', '+++', '===',
+      'workout:', 'wod:', 'part:', 'section:'
+    ];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lowerLine = line.toLowerCase();
+      
+      // Check if this line indicates a new workout entity
+      const isNewEntity = workoutSeparators.some(separator => 
+        lowerLine.includes(separator) || 
+        lowerLine.startsWith(separator) ||
+        // Check for numbered patterns like "1.", "2.", etc.
+        /^\d+\.\s/.test(line) ||
+        // Check for uppercase headers
+        (line === line.toUpperCase() && line.length > 5) ||
+        // Check for time-based splits
+        /^\d+:\d+/.test(line)
+      );
+      
+      if (isNewEntity && currentEntity.length > 0) {
+        // Start a new entity
+        workoutEntities.push([...currentEntity]);
+        currentEntity = [line];
+      } else {
+        currentEntity.push(line);
+      }
+    }
+    
+    // Add the last entity
+    if (currentEntity.length > 0) {
+      workoutEntities.push(currentEntity);
+    }
+    
+    // If no clear separators found, treat as single workout
+    if (workoutEntities.length === 1 && workoutEntities[0].length === lines.length) {
+      return [lines];
+    }
+    
+    return workoutEntities;
+  }
+
+  private static parseWorkoutEntity(lines: string[]): ParsedWorkout {
     const result: ParsedWorkout = {
       name: '',
       description: '',
@@ -59,7 +120,8 @@ export class WorkoutParser {
     };
 
     // Extract date if present (usually in first few lines)
-    const dateMatch = rawText.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
+    const fullText = lines.join('\n');
+    const dateMatch = fullText.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{4}[-\/]\d{1,2}[-\/]\d{1,2})/);
     if (dateMatch) {
       result.date = dateMatch[1];
     }

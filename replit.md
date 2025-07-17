@@ -10,6 +10,26 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**July 17, 2025 - Major Feature Enhancements**
+- **Authentication System Overhaul**: Added proper registration requirement before sign-in
+  - Added `isRegistered` and `registeredAt` fields to user schema
+  - Created comprehensive registration page with user profile setup
+  - Modified authentication flow to require registration completion
+  - Updated useAuth hook to handle registration status
+- **Navigation Improvements**: Added logout functionality and Home links
+  - Added logout option in user dropdown menu 
+  - Added Home navigation link to return to landing page
+  - Improved mobile navigation with consistent logout access
+- **Workout Parser Enhancement**: Implemented multi-workout entity parsing
+  - Parser now splits single WOD text into multiple distinct workout entities
+  - Added intelligent workout separators (Workout A/B, Strength/Metcon, etc.)
+  - Created bulk workout creation API endpoint for parsed workouts
+  - Enhanced workout parsing to handle complex workout structures
+- **Database Schema Updates**: Added registration tracking and validation
+  - Updated user table with registration status fields
+  - Applied database migrations for new schema
+  - Added environment variable validation for production deployment
+
 **July 17, 2025 - Deployment Fixes Applied**
 - Updated server startup to use standard Express app.listen method for Cloud Run compatibility
 - Added PORT environment variable support with fallback to 5000 for local development

@@ -42,6 +42,8 @@ export const users = pgTable("users", {
   yearsOfExperience: integer("years_of_experience"),
   bio: text("bio"),
   socialHandles: jsonb("social_handles"),
+  isRegistered: boolean("is_registered").default(false),
+  registeredAt: timestamp("registered_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

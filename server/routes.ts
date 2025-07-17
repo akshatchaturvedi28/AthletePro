@@ -47,6 +47,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
+      // Check if user is properly registered
+      if (!user.isRegistered) {
+        return res.status(403).json({ message: "User not registered", needsRegistration: true });
+      }
+      
       // Get user's community membership
       const membership = await storage.getUserMembership(userId);
       
@@ -57,6 +62,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // User registration endpoint
+  app.post('/api/auth/register', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { username, phoneNumber, occupation, bodyWeight, bodyHeight, yearsOfExperience, bio } = req.body;
+      
+      // Check if user already exists and is registered
+      const existingUser = await storage.getUser(userId);
+      if (existingUser?.isRegistered) {
+        return res.status(400).json({ message: "User already registered" });
+      }
+      
+      // Update user with registration information
+      const updatedUser = await storage.updateUser(userId, {
+        username,
+        phoneNumber,
+        occupation,
+        bodyWeight,
+        bodyHeight,
+        yearsOfExperience,
+        bio,
+        isRegistered: true,
+        registeredAt: new Date()
+      });
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({ message: "Registration completed successfully", user: updatedUser });
+    } catch (error) {
+      console.error("Error registering user:", error);
+      res.status(500).json({ message: "Failed to register user" });
     }
   });
 
@@ -189,8 +230,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Raw text is required" });
       }
       
-      const parsed = WorkoutParser.parseWorkout(rawText);
-      res.json(parsed);
+      const parsedWorkouts = WorkoutParser.parseWorkout(rawText);
+      res.json({
+        workouts: parsedWorkouts,
+        count: parsedWorkouts.length
+      });
     } catch (error) {
       console.error("Error parsing workout:", error);
       res.status(500).json({ message: "Failed to parse workout" });
@@ -213,6 +257,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid input", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create workout" });
+    }
+  });
+
+  // Bulk workout creation from parsed data
+  app.post('/api/workouts/bulk', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { parsedWorkouts, communityId } = req.body;
+      
+      if (!parsedWorkouts || !Array.isArray(parsedWorkouts)) {
+        return res.status(400).json({ message: "parsedWorkouts array is required" });
+      }
+      
+      const createdWorkouts = [];
+      for (const parsed of parsedWorkouts) {
+        const workoutData = WorkoutParser.createWorkoutFromParsed(
+          parsed,
+          userId,
+          communityId
+        );
+        
+        const workout = await storage.createWorkout(workoutData);
+        createdWorkouts.push(workout);
+      }
+      
+      res.json({
+        workouts: createdWorkouts,
+        count: createdWorkouts.length
+      });
+    } catch (error) {
+      console.error("Error creating bulk workouts:", error);
+      res.status(500).json({ message: "Failed to create workouts" });
     }
   });
 

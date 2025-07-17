@@ -83,6 +83,12 @@ export function Navbar() {
                 {(user?.membership?.role === "manager" || user?.membership?.role === "coach") && (
                   <>
                     <Link
+                      href="/admin"
+                      className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
+                    >
+                      Admin Console
+                    </Link>
+                    <Link
                       href="/community"
                       className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
                     >
@@ -101,6 +107,12 @@ export function Navbar() {
                   className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
                 >
                   Progress
+                </Link>
+                <Link
+                  href="/"
+                  className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Home
                 </Link>
               </>
             )}
@@ -214,6 +226,13 @@ export function Navbar() {
                   {(user?.membership?.role === "manager" || user?.membership?.role === "coach") && (
                     <>
                       <Link
+                        href="/admin"
+                        className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Admin Console
+                      </Link>
+                      <Link
                         href="/community"
                         className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
                         onClick={() => setMobileMenuOpen(false)}
@@ -235,6 +254,13 @@ export function Navbar() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Progress
+                  </Link>
+                  <Link
+                    href="/"
+                    className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Home
                   </Link>
                 </>
               )}

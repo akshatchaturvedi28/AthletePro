@@ -16,7 +16,7 @@ interface UserWithMembership extends User {
 }
 
 export function useAuth() {
-  const { data: user, isLoading } = useQuery<UserWithMembership>({
+  const { data: user, isLoading, error } = useQuery<UserWithMembership>({
     queryKey: ["/api/auth/user"],
     retry: false,
     queryFn: async () => {
@@ -26,6 +26,13 @@ export function useAuth() {
       
       if (res.status === 401) {
         return null;
+      }
+      
+      if (res.status === 403) {
+        const errorData = await res.json();
+        if (errorData.needsRegistration) {
+          throw new Error("NEEDS_REGISTRATION");
+        }
       }
       
       if (!res.ok) {
@@ -40,5 +47,6 @@ export function useAuth() {
     user,
     isLoading,
     isAuthenticated: !!user,
+    needsRegistration: error?.message === "NEEDS_REGISTRATION",
   };
 }

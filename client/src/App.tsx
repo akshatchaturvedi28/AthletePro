@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
+import Registration from "@/pages/registration";
 import AthleteDashboard from "@/pages/athlete/dashboard";
 import AthleteCalendar from "@/pages/athlete/calendar";
 import AthleteProfile from "@/pages/athlete/profile";
@@ -13,13 +14,14 @@ import AthleteProgress from "@/pages/athlete/progress";
 import CoachDashboard from "@/pages/coach/dashboard";
 import CoachCommunity from "@/pages/coach/community";
 import CoachLeaderboard from "@/pages/coach/leaderboard";
+import AdminConsole from "@/pages/admin/console";
 import CommunityLanding from "@/pages/community-landing";
 import About from "@/pages/about";
 import Contact from "@/pages/contact";
 import Privacy from "@/pages/privacy";
 
 function Router() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, needsRegistration } = useAuth();
 
   if (isLoading) {
     return (
@@ -27,6 +29,11 @@ function Router() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
+  }
+
+  // Show registration page if user needs to complete registration
+  if (needsRegistration) {
+    return <Registration />;
   }
 
   return (
@@ -48,6 +55,7 @@ function Router() {
               <Route path="/dashboard" component={CoachDashboard} />
               <Route path="/community" component={CoachCommunity} />
               <Route path="/leaderboard" component={CoachLeaderboard} />
+              <Route path="/admin" component={AdminConsole} />
               <Route path="/profile" component={AthleteProfile} />
               <Route path="/progress" component={AthleteProgress} />
             </>
