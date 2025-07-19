@@ -88,11 +88,11 @@ app.use((req, res, next) => {
     }
 
     // Use PORT environment variable for Cloud Run compatibility
-    // Fall back to 5000 for local development
-    const port = parseInt(process.env.PORT || "5000", 10);
+    // Fall back to 8080 for local development
+    const port = parseInt(process.env.PORT || "8080", 10);
     
     if (isNaN(port) || port < 1 || port > 65535) {
-      throw new Error(`Invalid port number: ${process.env.PORT || "5000"}`);
+      throw new Error(`Invalid port number: ${process.env.PORT || "8080"}`);
     }
     
     // Error handling for server startup

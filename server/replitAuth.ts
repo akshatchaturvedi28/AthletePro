@@ -10,7 +10,7 @@ import { storage } from "./storage";
 
 if (!process.env.REPLIT_DOMAINS) {
   // For local development, set a default value
-  process.env.REPLIT_DOMAINS = "localhost:5000,127.0.0.1:5000";
+  process.env.REPLIT_DOMAINS = "localhost:8080,127.0.0.1:8080";
   console.warn("REPLIT_DOMAINS not set, using default for local development");
 }
 

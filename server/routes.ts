@@ -84,13 +84,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      let user = await storage.getUser(userId);
+      
+      // For development mode, create user if doesn't exist
+      if (!user && process.env.NODE_ENV === 'development') {
+        user = await storage.upsertUser({
+          id: userId,
+          username: 'LocalDevUser',
+          email: 'dev@localhost.com',
+          phoneNumber: '+1234567890',
+          occupation: 'Developer',
+          bodyWeight: '70',
+          bodyHeight: '175',
+          yearsOfExperience: 2,
+          bio: 'Local development user for testing',
+          isRegistered: true,
+          registeredAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+      }
+      
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Check if user is properly registered
-      if (!user.isRegistered) {
+      // For development, always consider user as registered
+      if (process.env.NODE_ENV === 'development' && !user.isRegistered) {
+        const updatedUser = await storage.updateUser(userId, {
+          isRegistered: true,
+          registeredAt: new Date()
+        });
+        if (updatedUser) {
+          user = updatedUser;
+        }
+      }
+      
+      // Check if user is properly registered (skip for development)
+      if (process.env.NODE_ENV !== 'development' && !user.isRegistered) {
         return res.status(403).json({ message: "User not registered", needsRegistration: true });
       }
       

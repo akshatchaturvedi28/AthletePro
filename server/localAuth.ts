@@ -1,91 +1,59 @@
+import type { Express } from "express";
 import session from "express-session";
-import type { Express, RequestHandler } from "express";
-import connectPg from "connect-pg-simple";
+import MemoryStore from "memorystore";
 
-export function getLocalSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
-  
-  return session({
-    secret: process.env.SESSION_SECRET || 'local-dev-secret-change-in-production',
-    store: sessionStore,
+const MemoryStoreSession = MemoryStore(session);
+
+export function setupLocalAuth(app: Express) {
+  // Set up session for local development
+  app.use(session({
+    store: new MemoryStoreSession({
+      checkPeriod: 86400000 // prune expired entries every 24h
+    }),
+    secret: process.env.SESSION_SECRET || 'local-dev-secret',
     resave: false,
     saveUninitialized: false,
     cookie: {
+      secure: false, // Allow non-HTTPS in development
       httpOnly: true,
-      secure: false, // Allow HTTP for local development
-      maxAge: sessionTtl,
-    },
-  });
-}
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
 
-// Simple authentication middleware for local development
-export const isAuthenticated: RequestHandler = (req: any, res, next) => {
-  // For local development, create a mock user if none exists
-  if (!req.user) {
-    req.user = {
-      claims: {
-        sub: 'local-dev-user-' + Date.now(),
-        name: 'Local Dev User',
-        email: 'dev@localhost.com'
-      }
-    };
-  }
-  next();
-};
-
-export function setupLocalAuth(app: Express) {
-  // Add session middleware
-  app.use(getLocalSession());
-  
-  // Mock login endpoint for local development
-  app.post('/api/login', (req: any, res) => {
-    req.user = {
+  // Mock login endpoint for development
+  app.get('/api/login', (req: any, res) => {
+    // Create a mock user session
+    req.session.user = {
       claims: {
         sub: 'local-dev-user',
         name: 'Local Dev User',
-        email: 'dev@localhost.com'
+        email: 'dev@localhost.com',
+        firstName: 'Dev',
+        lastName: 'User'
       }
     };
     
-    // Save user in session
-    req.session.user = req.user;
-    
-    res.json({ 
-      message: 'Local development login successful',
-      user: req.user 
-    });
+    // Redirect to the main app
+    res.redirect('/');
   });
-  
+
   // Mock logout endpoint
-  app.post('/api/logout', (req: any, res) => {
-    req.session.destroy(() => {
-      res.json({ message: 'Logged out' });
+  app.get('/api/logout', (req: any, res) => {
+    req.session.destroy((err: any) => {
+      if (err) {
+        console.error('Session destruction error:', err);
+      }
+      res.redirect('/');
     });
   });
-  
-  // Mock user endpoint
-  app.get('/api/auth/user', (req: any, res) => {
-    if (req.session.user) {
-      res.json({
-        user: req.session.user,
-        needsRegistration: true // Always show registration flow for local dev
-      });
-    } else {
-      res.status(401).json({ message: 'Not authenticated' });
-    }
-  });
-  
-  // Session middleware to restore user
+
+  // Middleware to populate req.user from session
   app.use((req: any, res, next) => {
-    if (req.session.user) {
+    if (req.session?.user) {
       req.user = req.session.user;
+      req.isAuthenticated = () => true;
+    } else {
+      req.isAuthenticated = () => false;
     }
     next();
   });
