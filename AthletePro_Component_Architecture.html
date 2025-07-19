@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AthletePro Component Architecture</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            margin-top: 40px;
+            margin-bottom: 20px;
+        }
+        
+        h3 {
+            color: #2c3e50;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        h4 {
+            color: #7f8c8d;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        
+        .mermaid {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        pre {
+            background-color: #f4f4f4;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        
+        code {
+            background-color: #f1f2f6;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+        
+        ul, ol {
+            padding-left: 25px;
+        }
+        
+        li {
+            margin-bottom: 5px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .endpoint {
+            background-color: #e8f5e8;
+            padding: 8px 12px;
+            border-left: 4px solid #28a745;
+            margin: 5px 0;
+            font-family: monospace;
+        }
+        
+        .note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>AthletePro Component Architecture</h1>
+    
+    <div class="section">
+        <h2>Overview</h2>
+        <p>AthletePro is a full-stack fitness application built with React/TypeScript frontend and Node.js/Express backend, using PostgreSQL with Drizzle ORM for data persistence.</p>
+    </div>
+
+    <div class="section">
+        <h2>System Architecture</h2>
+        <div class="mermaid">
+            graph TB
+                subgraph "Frontend (React/TypeScript)"
+                    A[Client App] --> B[Pages]
+                    A --> C[Components]
+                    A --> D[Hooks]
+                    A --> E[Lib/Utils]
+                    
+                    B --> B1[Landing]
+                    B --> B2[Registration]
+                    B --> B3[Athlete Pages]
+                    B --> B4[Coach Pages]
+                    B --> B5[Admin Pages]
+                    
+                    C --> C1[Layout Components]
+                    C --> C2[UI Components]
+                    C --> C3[Workout Components]
+                    C --> C4[Community Components]
+                    C --> C5[Progress Components]
+                    
+                    D --> D1[useAuth]
+                    D --> D2[useToast]
+                    D --> D3[useMobile]
+                    
+                    E --> E1[Auth Utils]
+                    E --> E2[Query Client]
+                    E --> E3[Utils]
+                end
+                
+                subgraph "Backend (Node.js/Express)"
+                    F[Server] --> G[Routes]
+                    F --> H[Services]
+                    F --> I[Data Layer]
+                    F --> J[Auth System]
+                    
+                    G --> G1[Auth Routes]
+                    G --> G2[User Routes]
+                    G --> G3[Community Routes]
+                    G --> G4[Workout Routes]
+                    G --> G5[Progress Routes]
+                    
+                    H --> H1[Workout Parser]
+                    H --> H2[Progress Tracker]
+                    
+                    I --> I1[Storage Layer]
+                    I --> I2[Database]
+                    
+                    J --> J1[Replit Auth]
+                    J --> J2[Local Auth]
+                end
+                
+                subgraph "Database"
+                    K[PostgreSQL] --> L[Schema]
+                    L --> L1[Users]
+                    L --> L2[Communities]
+                    L --> L3[Workouts]
+                    L --> L4[Workout Logs]
+                    L --> L5[Olympic Lifts]
+                    L --> L6[Attendance]
+                    L --> L7[Announcements]
+                end
+                
+                A --> F
+                I1 --> K
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Frontend Component Structure</h2>
+        
+        <h3>Pages Layer</h3>
+        <ul>
+            <li><strong>Landing Pages</strong>: Marketing and informational pages</li>
+            <li><strong>Auth Pages</strong>: Registration and login flows</li>
+            <li><strong>Athlete Dashboard</strong>: Personal workout tracking and progress</li>
+            <li><strong>Coach Dashboard</strong>: Community management and athlete oversight</li>
+            <li><strong>Admin Console</strong>: System administration</li>
+        </ul>
+
+        <h3>Component Hierarchy</h3>
+        <div class="mermaid">
+            graph TD
+                A[App.tsx] --> B[Layout Components]
+                A --> C[Page Components]
+                
+                B --> B1[Navbar]
+                B --> B2[Sidebar]
+                
+                C --> C1[Athlete Pages]
+                C --> C2[Coach Pages]
+                C --> C3[Admin Pages]
+                
+                C1 --> C1a[Dashboard]
+                C1 --> C1b[Calendar]
+                C1 --> C1c[Profile]
+                C1 --> C1d[Progress]
+                
+                C2 --> C2a[Dashboard]
+                C2 --> C2b[Community]
+                C2 --> C2c[Leaderboard]
+                
+                C3 --> C3a[Console]
+                
+                D[UI Components] --> D1[shadcn/ui Base]
+                D --> D2[Custom Extensions]
+                
+                E[Workout Components] --> E1[Workout Log]
+                E --> E2[Workout Parser]
+                
+                F[Community Components] --> F1[Leaderboard]
+                
+                G[Progress Components] --> G1[Progress Charts]
+        </div>
+
+        <h3>Key Frontend Features</h3>
+        <ol>
+            <li><strong>Authentication System</strong>
+                <ul>
+                    <li>useAuth hook for authentication state</li>
+                    <li>Automatic redirect handling</li>
+                    <li>User registration flow</li>
+                </ul>
+            </li>
+            <li><strong>Workout Management</strong>
+                <ul>
+                    <li>Workout parsing from text input</li>
+                    <li>Workout logging with timing and performance</li>
+                    <li>Benchmark workout tracking</li>
+                </ul>
+            </li>
+            <li><strong>Community Features</strong>
+                <ul>
+                    <li>Community creation and management</li>
+                    <li>Member management</li>
+                    <li>Leaderboards and rankings</li>
+                </ul>
+            </li>
+            <li><strong>Progress Tracking</strong>
+                <ul>
+                    <li>Personal progress insights</li>
+                    <li>Olympic lift tracking</li>
+                    <li>Performance analytics</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>Backend Architecture</h2>
+        
+        <h3>Service Layer</h3>
+        <div class="mermaid">
+            graph LR
+                A[API Routes] --> B[Services]
+                B --> C[Storage Layer]
+                C --> D[Database]
+                
+                B --> B1[Workout Parser]
+                B --> B2[Progress Tracker]
+                
+                B1 --> B1a[Parse Text Workouts]
+                B1 --> B1b[Extract Movements]
+                B1 --> B1c[Calculate Scores]
+                
+                B2 --> B2a[Generate Insights]
+                B2 --> B2b[Track Olympic Lifts]
+                B2 --> B2c[Community Rankings]
+        </div>
+
+        <h3>API Endpoints</h3>
+        
+        <h4>Authentication</h4>
+        <div class="endpoint">GET /api/auth/user - Get current user</div>
+        <div class="endpoint">POST /api/auth/register - Register new user</div>
+        <div class="endpoint">GET /api/login - Local development login</div>
+        <div class="endpoint">GET /api/logout - Logout</div>
+
+        <h4>Communities</h4>
+        <div class="endpoint">POST /api/communities - Create community</div>
+        <div class="endpoint">GET /api/communities/my - Get user's community</div>
+        <div class="endpoint">GET /api/communities/:id - Get community details</div>
+        <div class="endpoint">GET /api/communities/:id/members - Get community members</div>
+        <div class="endpoint">POST /api/communities/:id/members - Add member</div>
+        <div class="endpoint">DELETE /api/communities/:id/members/:userId - Remove member</div>
+
+        <h4>Workouts</h4>
+        <div class="endpoint">POST /api/workouts/parse - Parse workout text</div>
+        <div class="endpoint">POST /api/workouts - Create workout</div>
+        <div class="endpoint">POST /api/workouts/bulk - Create multiple workouts</div>
+        <div class="endpoint">GET /api/workouts/my - Get user workouts</div>
+        <div class="endpoint">GET /api/workouts/community/:id - Get community workouts</div>
+
+        <h4>Workout Logs</h4>
+        <div class="endpoint">POST /api/workout-logs - Log workout completion</div>
+        <div class="endpoint">GET /api/workout-logs/my - Get user logs</div>
+        <div class="endpoint">GET /api/workout-logs/community/:id - Get community logs</div>
+
+        <h4>Progress & Leaderboard</h4>
+        <div class="endpoint">GET /api/progress/insights - Get progress insights</div>
+        <div class="endpoint">GET /api/leaderboard/community/:id - Get community leaderboard</div>
+    </div>
+
+    <div class="section">
+        <h2>Database Schema</h2>
+        
+        <h3>Core Tables</h3>
+        <div class="mermaid">
+            erDiagram
+                USERS {
+                    text id PK
+                    text username
+                    text email
+                    text phone_number
+                    text occupation
+                    integer body_weight
+                    integer body_height
+                    integer years_of_experience
+                    text bio
+                    boolean is_registered
+                    timestamp registered_at
+                    timestamp created_at
+                    timestamp updated_at
+                }
+                
+                COMMUNITIES {
+                    serial id PK
+                    text name
+                    text description
+                    text manager_id FK
+                    timestamp created_at
+                    timestamp updated_at
+                }
+                
+                COMMUNITY_MEMBERSHIPS {
+                    serial id PK
+                    integer community_id FK
+                    text user_id FK
+                    text role
+                    timestamp joined_at
+                }
+                
+                WORKOUTS {
+                    serial id PK
+                    text name
+                    text type
+                    text movements
+                    integer time_cap
+                    text description
+                    text created_by FK
+                    integer community_id FK
+                    timestamp created_at
+                }
+                
+                WORKOUT_LOGS {
+                    serial id PK
+                    integer workout_id FK
+                    text user_id FK
+                    integer time_taken
+                    integer total_effort
+                    text final_score
+                    json barbell_lift_details
+                    timestamp completed_at
+                }
+                
+                OLYMPIC_LIFTS {
+                    serial id PK
+                    text user_id FK
+                    text lift_name
+                    integer weight
+                    integer reps
+                    timestamp performed_at
+                }
+                
+                USERS ||--o{ COMMUNITIES : manages
+                USERS ||--o{ COMMUNITY_MEMBERSHIPS : belongs_to
+                COMMUNITIES ||--o{ COMMUNITY_MEMBERSHIPS : has
+                USERS ||--o{ WORKOUTS : creates
+                COMMUNITIES ||--o{ WORKOUTS : contains
+                WORKOUTS ||--o{ WORKOUT_LOGS : logged_as
+                USERS ||--o{ WORKOUT_LOGS : performs
+                USERS ||--o{ OLYMPIC_LIFTS : performs
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Key Features & Interactions</h2>
+
+        <h3>1. User Registration Flow</h3>
+        <div class="mermaid">
+            sequenceDiagram
+                participant U as User
+                participant F as Frontend
+                participant B as Backend
+                participant D as Database
+                
+                U->>F: Access application
+                F->>B: GET /api/auth/user
+                B->>D: Check user exists
+                D-->>B: User not registered
+                B-->>F: needsRegistration: true
+                F->>U: Show registration form
+                U->>F: Submit registration
+                F->>B: POST /api/auth/register
+                B->>D: Update user record
+                D-->>B: User updated
+                B-->>F: Registration complete
+                F->>U: Redirect to dashboard
+        </div>
+
+        <h3>2. Workout Logging Flow</h3>
+        <div class="mermaid">
+            sequenceDiagram
+                participant U as User
+                participant F as Frontend
+                participant B as Backend
+                participant P as Workout Parser
+                participant D as Database
+                
+                U->>F: Enter workout text
+                F->>B: POST /api/workouts/parse
+                B->>P: Parse workout text
+                P-->>B: Parsed workout data
+                B-->>F: Structured workout
+                F->>U: Show parsed workout
+                U->>F: Confirm and log workout
+                F->>B: POST /api/workout-logs
+                B->>D: Store workout log
+                D-->>B: Log created
+                B-->>F: Log confirmation
+                F->>U: Show completion
+        </div>
+
+        <h3>3. Community Leaderboard</h3>
+        <div class="mermaid">
+            sequenceDiagram
+                participant U as User
+                participant F as Frontend
+                participant B as Backend
+                participant T as Progress Tracker
+                participant D as Database
+                
+                U->>F: View leaderboard
+                F->>B: GET /api/leaderboard/community/:id
+                B->>T: Calculate rankings
+                T->>D: Query workout logs
+                D-->>T: Log data
+                T->>T: Calculate scores & rankings
+                T-->>B: Ranked results
+                B-->>F: Leaderboard data
+                F->>U: Display rankings
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Technology Stack</h2>
+        
+        <h3>Frontend</h3>
+        <ul>
+            <li>React 18 with TypeScript</li>
+            <li>Vite for build tooling</li>
+            <li>TailwindCSS for styling</li>
+            <li>shadcn/ui for component library</li>
+            <li>Framer Motion for animations</li>
+            <li>React Hook Form for form handling</li>
+            <li>Recharts for data visualization</li>
+            <li>Wouter for routing</li>
+        </ul>
+
+        <h3>Backend</h3>
+        <ul>
+            <li>Node.js with Express</li>
+            <li>TypeScript for type safety</li>
+            <li>Drizzle ORM for database interactions</li>
+            <li>PostgreSQL (Neon) for data storage</li>
+            <li>Express Session for session management</li>
+            <li>Zod for validation</li>
+        </ul>
+
+        <h3>Development Tools</h3>
+        <ul>
+            <li>ESBuild for production builds</li>
+            <li>TSX for TypeScript execution</li>
+            <li>Drizzle Kit for database migrations</li>
+            <li>Replit integration for cloud development</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Recommended Next Steps</h2>
+        <div class="note">
+            <ol>
+                <li><strong>Start Development Server</strong>: <code>npm run dev</code></li>
+                <li><strong>Access Application</strong>: <code>http://localhost:8080</code></li>
+                <li><strong>Database Setup</strong>: <code>npm run db:push</code></li>
+                <li><strong>Local Authentication</strong>: Visit <code>/api/login</code> for development login</li>
+            </ol>
+            <p>The application is now ready for local development with all dependencies resolved and missing files created.</p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid with custom theme
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#3498db',
+                primaryTextColor: '#2c3e50',
+                primaryBorderColor: '#2980b9',
+                lineColor: '#7f8c8d',
+                sectionBkgColor: '#ecf0f1',
+                altSectionBkgColor: '#bdc3c7',
+                gridColor: '#95a5a6',
+                secondaryColor: '#e74c3c',
+                tertiaryColor: '#f39c12'
+            },
+            flowchart: {
+                htmlLabels: true,
+                curve: 'basis'
+            },
+            sequence: {
+                diagramMarginX: 50,
+                diagramMarginY: 10,
+                actorMargin: 50,
+                width: 150,
+                height: 65,
+                boxMargin: 10,
+                boxTextMargin: 5,
+                noteMargin: 10,
+                messageMargin: 35
+            },
+            er: {
+                diagramPadding: 20,
+                layoutDirection: 'TB',
+                minEntityWidth: 100,
+                minEntityHeight: 75,
+                entityPadding: 15,
+                stroke: '#2c3e50',
+                fill: '#ecf0f1'
+            }
+        });
+    </script>
+</body>
+</html>
