@@ -9,7 +9,9 @@ import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
 if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
+  // For local development, set a default value
+  process.env.REPLIT_DOMAINS = "localhost:5000,127.0.0.1:5000";
+  console.warn("REPLIT_DOMAINS not set, using default for local development");
 }
 
 const getOidcConfig = memoize(
@@ -38,7 +40,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: sessionTtl,
     },
   });

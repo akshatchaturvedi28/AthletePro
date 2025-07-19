@@ -2,6 +2,27 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+
+// Helper to get the right auth middleware based on environment
+const getAuthMiddleware = () => {
+  if (process.env.NODE_ENV === 'development') {
+    // For development, use a simple middleware that doesn't require real auth
+    return (req: any, res: any, next: any) => {
+      // Create a mock user if none exists
+      if (!req.user) {
+        req.user = {
+          claims: {
+            sub: 'local-dev-user',
+            name: 'Local Dev User',
+            email: 'dev@localhost.com'
+          }
+        };
+      }
+      next();
+    };
+  }
+  return isAuthenticated;
+};
 import { WorkoutParser } from "./services/workoutParser";
 import { ProgressTracker } from "./services/progressTracker";
 import { BENCHMARK_WORKOUTS } from "./data/benchmarkWorkouts";
@@ -15,8 +36,13 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Auth middleware - use local auth for development
+  if (process.env.NODE_ENV === 'development') {
+    const { setupLocalAuth } = await import("./localAuth.js");
+    setupLocalAuth(app);
+  } else {
+    await setupAuth(app);
+  }
 
   // Seed benchmark workouts on startup
   (async () => {
@@ -33,11 +59,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   })();
 
+  // Get auth middleware
+  const authMiddleware = getAuthMiddleware();
+
   // Auth routes
   app.get('/api/auth/user', async (req: any, res) => {
     try {
+      // For development, always create a mock user
+      if (process.env.NODE_ENV === 'development') {
+        if (!req.user) {
+          req.user = {
+            claims: {
+              sub: 'local-dev-user',
+              name: 'Local Dev User',
+              email: 'dev@localhost.com'
+            }
+          };
+        }
+      }
+      
       // Check if user is authenticated
-      if (!req.isAuthenticated() || !req.user?.claims?.sub) {
+      if (process.env.NODE_ENV !== 'development' && (!req.isAuthenticated() || !req.user?.claims?.sub)) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
@@ -66,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User registration endpoint
-  app.post('/api/auth/register', isAuthenticated, async (req: any, res) => {
+  app.post('/api/auth/register', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { username, phoneNumber, occupation, bodyWeight, bodyHeight, yearsOfExperience, bio } = req.body;
@@ -102,7 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User profile routes
-  app.patch('/api/user/profile', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/user/profile', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const updates = req.body;
@@ -120,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Community routes
-  app.post('/api/communities', isAuthenticated, async (req: any, res) => {
+  app.post('/api/communities', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const communityData = insertCommunitySchema.parse({
@@ -147,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/my', isAuthenticated, async (req: any, res) => {
+  app.get('/api/communities/my', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const community = await storage.getCommunityByManager(userId);
@@ -163,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/communities/:id', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const community = await storage.getCommunity(communityId);
@@ -179,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/members', isAuthenticated, async (req, res) => {
+  app.get('/api/communities/:id/members', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const members = await storage.getCommunityMembers(communityId);
@@ -190,7 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/communities/:id/members', isAuthenticated, async (req, res) => {
+  app.post('/api/communities/:id/members', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const membershipData = insertCommunityMembershipSchema.parse({
@@ -209,7 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/communities/:id/members/:userId', isAuthenticated, async (req, res) => {
+  app.delete('/api/communities/:id/members/:userId', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const userId = req.params.userId;
@@ -223,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workout routes
-  app.post('/api/workouts/parse', isAuthenticated, async (req, res) => {
+  app.post('/api/workouts/parse', authMiddleware, async (req, res) => {
     try {
       const { rawText } = req.body;
       if (!rawText) {
@@ -241,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/workouts', isAuthenticated, async (req: any, res) => {
+  app.post('/api/workouts', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const workoutData = insertWorkoutSchema.parse({
@@ -261,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk workout creation from parsed data
-  app.post('/api/workouts/bulk', isAuthenticated, async (req: any, res) => {
+  app.post('/api/workouts/bulk', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { parsedWorkouts, communityId } = req.body;
@@ -292,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workouts/my', isAuthenticated, async (req: any, res) => {
+  app.get('/api/workouts/my', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const workouts = await storage.getUserWorkouts(userId);
@@ -303,7 +345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workouts/community/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/workouts/community/:id', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const workouts = await storage.getCommunityWorkouts(communityId);
@@ -314,7 +356,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workouts/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/workouts/:id', authMiddleware, async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
       const workout = await storage.getWorkout(workoutId);
@@ -331,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workout log routes
-  app.post('/api/workout-logs', isAuthenticated, async (req: any, res) => {
+  app.post('/api/workout-logs', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const logData = insertWorkoutLogSchema.parse({
@@ -376,7 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workout-logs/my', isAuthenticated, async (req: any, res) => {
+  app.get('/api/workout-logs/my', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const logs = await storage.getUserWorkoutLogs(userId);
@@ -387,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workout-logs/community/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/workout-logs/community/:id', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const date = req.query.date as string;
@@ -401,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Progress and leaderboard routes
-  app.get('/api/progress/insights', isAuthenticated, async (req: any, res) => {
+  app.get('/api/progress/insights', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const insights = await ProgressTracker.generateProgressInsights(userId);
@@ -412,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/leaderboard/community/:id', isAuthenticated, async (req, res) => {
+  app.get('/api/leaderboard/community/:id', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const workoutName = req.query.workout as string;
@@ -446,7 +488,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Olympic lift routes
-  app.get('/api/olympic-lifts/my', isAuthenticated, async (req: any, res) => {
+  app.get('/api/olympic-lifts/my', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const lifts = await storage.getUserOlympicLifts(userId);
@@ -457,7 +499,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/olympic-lifts/progress/:liftName', isAuthenticated, async (req: any, res) => {
+  app.get('/api/olympic-lifts/progress/:liftName', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const liftName = req.params.liftName;
@@ -470,7 +512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Community announcement routes
-  app.post('/api/communities/:id/announcements', isAuthenticated, async (req: any, res) => {
+  app.post('/api/communities/:id/announcements', authMiddleware, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
@@ -492,7 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/announcements', isAuthenticated, async (req, res) => {
+  app.get('/api/communities/:id/announcements', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const announcements = await storage.getCommunityAnnouncements(communityId);
@@ -504,7 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Community attendance routes
-  app.post('/api/communities/:id/attendance', isAuthenticated, async (req: any, res) => {
+  app.post('/api/communities/:id/attendance', authMiddleware, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
@@ -527,7 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/attendance', isAuthenticated, async (req, res) => {
+  app.get('/api/communities/:id/attendance', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const date = req.query.date as string;
@@ -545,7 +587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Community goals routes
-  app.post('/api/communities/:id/goals', isAuthenticated, async (req: any, res) => {
+  app.post('/api/communities/:id/goals', authMiddleware, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
@@ -564,7 +606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/goals', isAuthenticated, async (req, res) => {
+  app.get('/api/communities/:id/goals', authMiddleware, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const goals = await storage.getCommunityGoals(communityId);
@@ -575,7 +617,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/goals/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/goals/:id', authMiddleware, async (req, res) => {
     try {
       const goalId = parseInt(req.params.id);
       const { achieved } = req.body;
