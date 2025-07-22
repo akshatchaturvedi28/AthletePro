@@ -63,6 +63,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const authMiddleware = getAuthMiddleware();
 
   // Auth routes
+  app.get('/api/logout', async (req: any, res) => {
+    try {
+      // For development, just redirect to landing page
+      if (process.env.NODE_ENV === 'development') {
+        return res.redirect('/');
+      }
+      
+      // For production, handle session logout
+      if (req.session) {
+        req.session.destroy((err: any) => {
+          if (err) {
+            console.error('Error destroying session:', err);
+            return res.status(500).json({ message: 'Failed to logout' });
+          }
+          res.clearCookie('connect.sid');
+          res.redirect('/');
+        });
+      } else {
+        res.redirect('/');
+      }
+    } catch (error) {
+      console.error("Error during logout:", error);
+      res.status(500).json({ message: "Failed to logout" });
+    }
+  });
+
   app.get('/api/auth/user', async (req: any, res) => {
     try {
       // For development, always create a mock user
@@ -376,9 +402,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CRITICAL: Community routes MUST come before generic /api/workouts/:id route
+  // Handle community workouts - when no community ID (user not in a community)
+  app.get('/api/workouts/community', authMiddleware, async (req, res) => {
+    try {
+      console.log("Hit /api/workouts/community route");
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching community workouts:", error);
+      res.status(500).json({ message: "Failed to fetch workouts" });
+    }
+  });
+
+  app.get('/api/workouts/community/', authMiddleware, async (req, res) => {
+    try {
+      console.log("Hit /api/workouts/community/ route");
+      res.json([]);
+    } catch (error) {
+      console.error("Error fetching community workouts:", error);
+      res.status(500).json({ message: "Failed to fetch workouts" });
+    }
+  });
+
+  // Handle undefined, null, or invalid community IDs
   app.get('/api/workouts/community/:id', authMiddleware, async (req, res) => {
     try {
-      const communityId = parseInt(req.params.id);
+      const idParam = req.params.id;
+      console.log(`Hit /api/workouts/community/:id route with id: ${idParam}`);
+      
+      // Handle undefined, null, or empty string cases
+      if (!idParam || idParam === 'undefined' || idParam === 'null' || idParam === '') {
+        return res.json([]);
+      }
+      
+      const communityId = parseInt(idParam);
+      
+      // Add validation for NaN
+      if (isNaN(communityId)) {
+        return res.json([]); // Return empty array instead of error for invalid IDs
+      }
+      
       const workouts = await storage.getCommunityWorkouts(communityId);
       res.json(workouts);
     } catch (error) {
@@ -387,9 +450,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // CRITICAL: This generic route MUST come AFTER community routes
   app.get('/api/workouts/:id', authMiddleware, async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
+      console.log(`Hit /api/workouts/:id route with id: ${req.params.id}`);
+      
+      // Add validation for NaN
+      if (isNaN(workoutId)) {
+        return res.status(400).json({ message: "Invalid workout ID" });
+      }
+      
       const workout = await storage.getWorkout(workoutId);
       
       if (!workout) {

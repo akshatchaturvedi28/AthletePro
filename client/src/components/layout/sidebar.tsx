@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { 
   Calendar, 
   TrendingUp, 
@@ -11,7 +12,8 @@ import {
   BarChart3,
   Dumbbell,
   Target,
-  UserCog
+  UserCog,
+  LogOut
 } from "lucide-react";
 
 interface SidebarProps {
@@ -116,7 +118,7 @@ export function Sidebar({ className }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 mb-4">
           <div className="flex-shrink-0">
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-medium">
@@ -133,6 +135,16 @@ export function Sidebar({ className }: SidebarProps) {
             </p>
           </div>
         </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm"
+          className="w-full justify-start text-gray-700 hover:text-red-600 hover:border-red-200"
+          onClick={() => window.location.href = "/api/logout"}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
       </div>
     </div>
   );
