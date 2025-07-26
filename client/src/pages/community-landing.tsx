@@ -47,7 +47,12 @@ export default function CommunityLanding() {
                 <Button 
                   size="lg" 
                   className="bg-primary hover:bg-primary/90 text-white"
-                  onClick={() => window.location.href = '/api/login'}
+                  onClick={() => {
+                    // Show modal asking user to sign up as admin first
+                    if (confirm('Please sign up as an Admin first to create a community. Would you like to go to admin signup?')) {
+                      window.location.href = '/admin/signin?signup=true';
+                    }
+                  }}
                 >
                   <Users className="h-5 w-5 mr-2" />
                   Create Community
@@ -55,7 +60,13 @@ export default function CommunityLanding() {
                 <Button 
                   variant="outline" 
                   size="lg" 
-                  className="border-gray-400 text-white hover:bg-white hover:text-secondary"
+                  className="border-gray-400 text-white hover:bg-white hover:text-secondary bg-transparent"
+                  onClick={() => {
+                    const demoSection = document.querySelector('#demo');
+                    if (demoSection) {
+                      demoSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
                 >
                   <Trophy className="h-5 w-5 mr-2" />
                   See Demo

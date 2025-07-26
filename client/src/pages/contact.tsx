@@ -38,15 +38,36 @@ export default function Contact() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Simulate form submission
-    setTimeout(() => {
+    try {
+      // Send email to akshatchaturvedi17@gmail.com
+      const emailBody = `
+Name: ${formData.name}
+Email: ${formData.email}
+Subject: ${formData.subject}
+
+Message:
+${formData.message}
+      `.trim();
+      
+      // Use mailto to open email client
+      const mailtoUrl = `mailto:akshatchaturvedi17@gmail.com?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(emailBody)}`;
+      window.open(mailtoUrl, '_blank');
+      
       toast({
-        title: "Message Sent!",
-        description: "Thank you for reaching out. We'll get back to you within 24 hours.",
+        title: "Email Client Opened!",
+        description: "Your email client should now be open. Please send the email to complete your message.",
       });
+      
       setFormData({ name: "", email: "", subject: "", message: "" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Please try again or contact us directly at akshatchaturvedi17@gmail.com",
+        variant: "destructive"
+      });
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -60,7 +81,8 @@ export default function Contact() {
             Get in <span className="text-gradient">Touch</span>
           </h1>
           <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-            Have questions? Want to see a demo? We'd love to hear from you and help you get started with ACrossFit.
+            Have questions? Want to see a demo? We'd love to hear from you and help you get started with ACrossFit. 
+            We typically respond within 1 hour.
           </p>
         </div>
       </section>
@@ -88,8 +110,8 @@ export default function Contact() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-secondary">Email</h3>
-                        <p className="text-gray-600">support@acrossfit.com</p>
-                        <p className="text-sm text-gray-500">We typically respond within 24 hours</p>
+                        <p className="text-gray-600">akshatchaturvedi17@gmail.com</p>
+                        <p className="text-sm text-gray-500">We typically respond within 1 hour</p>
                       </div>
                     </div>
                   </CardContent>
@@ -103,8 +125,8 @@ export default function Contact() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-secondary">Phone</h3>
-                        <p className="text-gray-600">+1 (555) 123-4567</p>
-                        <p className="text-sm text-gray-500">Monday - Friday, 9AM - 6PM PST</p>
+                        <p className="text-gray-600">+91-8209347140</p>
+                        <p className="text-sm text-gray-500">Monday - Friday, 9AM - 6PM IST</p>
                       </div>
                     </div>
                   </CardContent>
@@ -118,8 +140,8 @@ export default function Contact() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-secondary">Location</h3>
-                        <p className="text-gray-600">San Francisco, CA</p>
-                        <p className="text-sm text-gray-500">Available for in-person meetings</p>
+                        <p className="text-gray-600">Hyderabad, India</p>
+                        <p className="text-sm text-gray-500">Available for remote meetings</p>
                       </div>
                     </div>
                   </CardContent>
@@ -265,7 +287,16 @@ export default function Contact() {
                 <p className="text-gray-600 mb-6">
                   Connect with other gym owners and athletes in our community forum. Share tips, ask questions, and learn from others.
                 </p>
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon...",
+                      description: "Community Forum will be available soon. For now, please contact us directly.",
+                    });
+                  }}
+                >
                   Join Forum
                 </Button>
               </CardContent>
@@ -280,7 +311,16 @@ export default function Contact() {
                 <p className="text-gray-600 mb-6">
                   Get instant help with our live chat support. Available during business hours for quick questions and technical support.
                 </p>
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon...",
+                      description: "Live Chat will be available soon. For now, please contact us directly.",
+                    });
+                  }}
+                >
                   Start Chat
                 </Button>
               </CardContent>
@@ -295,12 +335,74 @@ export default function Contact() {
                 <p className="text-gray-600 mb-6">
                   Access our comprehensive help center with articles, tutorials, and troubleshooting guides available 24/7.
                 </p>
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    toast({
+                      title: "Coming Soon...",
+                      description: "24/7 Help Center will be available soon. For now, please contact us directly.",
+                    });
+                  }}
+                >
                   Browse Articles
                 </Button>
               </CardContent>
             </Card>
           </div>
+        </div>
+      </section>
+
+      {/* Anonymous Feedback Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-secondary mb-4">Anonymous Feedback</h2>
+            <p className="text-xl text-gray-600">
+              Help us improve ACrossFit by sharing your thoughts anonymously.
+            </p>
+          </div>
+
+          <Card className="max-w-2xl mx-auto">
+            <CardContent className="p-8">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.target as HTMLFormElement);
+                  const feedback = formData.get('feedback') as string;
+                  
+                  if (feedback.trim()) {
+                    const mailtoUrl = `mailto:akshatchaturvedi17@gmail.com?subject=Anonymous Feedback&body=${encodeURIComponent(`Anonymous Feedback:\n\n${feedback}`)}`;
+                    window.open(mailtoUrl, '_blank');
+                    
+                    toast({
+                      title: "Feedback Sent!",
+                      description: "Thank you for your anonymous feedback. It will help us improve.",
+                    });
+                    
+                    (e.target as HTMLFormElement).reset();
+                  }
+                }}
+                className="space-y-6"
+              >
+                <div>
+                  <Label htmlFor="feedback">Your Feedback</Label>
+                  <Textarea
+                    id="feedback"
+                    name="feedback"
+                    placeholder="Share your thoughts, suggestions, or report issues anonymously..."
+                    rows={6}
+                    required
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full">
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Anonymous Feedback
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </section>
 

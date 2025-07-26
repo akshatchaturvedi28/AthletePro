@@ -59,20 +59,20 @@ export default function Privacy() {
                   <div>
                     <h3 className="font-semibold text-secondary mb-2">Personal Information</h3>
                     <ul className="text-gray-600 space-y-1 ml-4">
-                      <li>• Name and email address</li>
+                      <li>• <strong>Name and email address</strong> (required)</li>
                       <li>• Phone number (optional)</li>
-                      <li>• Profile information (bio, occupation, social media handles)</li>
-                      <li>• Body metrics (weight, height - optional)</li>
-                      <li>• Profile photos</li>
+                      <li>• Profile information (bio, occupation, social media handles) (optional)</li>
+                      <li>• Body metrics (weight, height) (optional)</li>
+                      <li>• Profile photos (optional)</li>
                     </ul>
                   </div>
                   
                   <div>
                     <h3 className="font-semibold text-secondary mb-2">Workout and Performance Data</h3>
                     <ul className="text-gray-600 space-y-1 ml-4">
-                      <li>• Workout logs and performance scores</li>
-                      <li>• Personal records and achievements</li>
-                      <li>• Training history and progress metrics</li>
+                      <li>• Workout logs and performance scores (optional)</li>
+                      <li>• Personal records and achievements (optional)</li>
+                      <li>• Training history and progress metrics (optional)</li>
                       <li>• Community participation data</li>
                     </ul>
                   </div>
@@ -197,7 +197,7 @@ export default function Privacy() {
                   <li>• <strong>Restrict:</strong> Limit how we process your information in certain circumstances</li>
                 </ul>
                 <p className="text-gray-600 mt-4">
-                  To exercise these rights, please contact us at privacy@acrossfit.com.
+                  To exercise these rights, please contact us at akshatchaturvedi17@gmail.com.
                 </p>
               </CardContent>
             </Card>
@@ -236,11 +236,9 @@ export default function Privacy() {
                   If you have any questions about this Privacy Policy or our data practices, please contact us:
                 </p>
                 <div className="space-y-2 text-gray-600">
-                  <p><strong>Email:</strong> privacy@acrossfit.com</p>
-                  <p><strong>Phone:</strong> +1 (555) 123-4567</p>
-                  <p><strong>Address:</strong> ACrossFit Privacy Team<br />
-                  123 Fitness Street<br />
-                  San Francisco, CA 94105</p>
+                  <p><strong>Email:</strong> akshatchaturvedi17@gmail.com</p>
+                  <p><strong>Phone:</strong> +91-8209347140</p>
+                  <p><strong>Address:</strong> Hyderabad, India</p>
                 </div>
               </CardContent>
             </Card>

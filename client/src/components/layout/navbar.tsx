@@ -40,6 +40,19 @@ export function Navbar() {
     { name: 'Contact', href: '/contact' }
   ];
 
+  const handleNavClick = (href: string) => {
+    if (href.startsWith('#')) {
+      // Handle anchor links by scrolling to section
+      const element = document.querySelector(href);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    } else {
+      // Handle regular navigation
+      navigate(href);
+    }
+  };
+
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -55,13 +68,13 @@ export function Navbar() {
             {!isAuthenticated ? (
               <>
                 {navigationItems.map((item) => (
-                  <Link
+                  <button
                     key={item.name}
-                    href={item.href}
+                    onClick={() => handleNavClick(item.href)}
                     className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
                   >
                     {item.name}
-                  </Link>
+                  </button>
                 ))}
               </>
             ) : (

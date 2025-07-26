@@ -40,7 +40,8 @@ export default function Landing() {
                 <span className="text-gradient block">Fun & Intelligent</span>
               </h1>
               <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-                AI-powered tools that empower athletes to improve, help coaches manage communities, and foster meaningful connections. Track progress, log workouts, and compete with your community.
+                Log workouts in less than 10 seconds with AI-powered tools. Create new workouts in under 30 seconds. 
+                Logging WODs has never been so easier. Compete with your box's athletes and track progress like never before.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <Button 
@@ -54,7 +55,14 @@ export default function Landing() {
                 <Button 
                   variant="outline" 
                   size="lg" 
-                  className="border-gray-400 text-white hover:bg-white hover:text-secondary"
+                  className="border-gray-400 text-white hover:bg-white hover:text-secondary bg-transparent"
+                  onClick={() => {
+                    // Demo functionality
+                    const demoSection = document.querySelector('#demo');
+                    if (demoSection) {
+                      demoSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
                 >
                   <Trophy className="h-5 w-5 mr-2" />
                   Watch Demo
@@ -112,12 +120,13 @@ export default function Landing() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-white">
+      <section id="features" className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-secondary mb-4">Powerful Features for Every Athlete</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              From AI-powered workout parsing to community leaderboards, ACrossFit provides everything you need to excel in your fitness journey.
+              Log workouts in less than 10 seconds, create new workouts in under 30 seconds. 
+              Compete with your box's athletes using our gamified badges and leaderboards.
             </p>
           </div>
 
@@ -242,6 +251,164 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Workouts Section */}
+      <section id="workouts" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-secondary mb-4">
+              Popular <span className="text-gradient">Workouts</span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Discover benchmark CrossFit workouts, create custom WODs, and compete with your community.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold">Fran</h3>
+                  <Badge variant="outline">For Time</Badge>
+                </div>
+                <div className="text-sm text-gray-600 mb-4 font-mono bg-gray-50 p-3 rounded">
+                  21-15-9 reps for time:<br/>
+                  • Thrusters (95/65 lb)<br/>
+                  • Pull-ups
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Avg Time: 8:45</span>
+                  <Trophy className="h-4 w-4 text-yellow-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold">Helen</h3>
+                  <Badge variant="outline">For Time</Badge>
+                </div>
+                <div className="text-sm text-gray-600 mb-4 font-mono bg-gray-50 p-3 rounded">
+                  3 rounds for time:<br/>
+                  • 400m Run<br/>
+                  • 21 KB Swings (53/35)<br/>
+                  • 12 Pull-ups
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Avg Time: 12:30</span>
+                  <Trophy className="h-4 w-4 text-yellow-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold">Murph</h3>
+                  <Badge variant="destructive">Hero WOD</Badge>
+                </div>
+                <div className="text-sm text-gray-600 mb-4 font-mono bg-gray-50 p-3 rounded">
+                  For time:<br/>
+                  • 1 mile Run<br/>
+                  • 100 Pull-ups<br/>
+                  • 200 Push-ups<br/>
+                  • 300 Air Squats<br/>
+                  • 1 mile Run
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-500">Avg Time: 45:00</span>
+                  <Trophy className="h-4 w-4 text-yellow-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center mt-12">
+            <Button 
+              size="lg" 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => window.location.href = '/signin'}
+            >
+              Browse All Workouts
+              <ArrowRight className="h-5 w-5 ml-2" />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Demo Section */}
+      <section id="demo" className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl font-bold text-secondary mb-6">
+            See ACrossFit in <span className="text-gradient">Action</span>
+          </h2>
+          <p className="text-xl text-gray-600 mb-8">
+            Watch how athletes and coaches use our platform to achieve their fitness goals.
+          </p>
+          <div className="bg-gray-100 rounded-xl p-12 mb-8">
+            <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trophy className="h-8 w-8 text-white" />
+                </div>
+                <p className="text-gray-600">Demo Video Coming Soon</p>
+              </div>
+            </div>
+          </div>
+          <Button 
+            size="lg" 
+            onClick={() => window.location.href = '/signup'}
+          >
+            Start Your Free Trial
+          </Button>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl font-bold text-secondary mb-6">
+            Simple <span className="text-gradient">Pricing</span>
+          </h2>
+          <p className="text-xl text-gray-600 mb-12">
+            Special launch pricing - All features free during beta period
+          </p>
+          
+          <Card className="max-w-md mx-auto">
+            <CardContent className="p-8 text-center">
+              <h3 className="text-2xl font-bold mb-4">Launch Pricing</h3>
+              <div className="text-4xl font-bold text-green-600 mb-4">FREE</div>
+              <p className="text-gray-600 mb-6">All features included during our launch period</p>
+              <ul className="text-left space-y-2 mb-8">
+                <li className="flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Unlimited workout logging
+                </li>
+                <li className="flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  AI-powered workout parsing
+                </li>
+                <li className="flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Community leaderboards
+                </li>
+                <li className="flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Progress tracking & analytics
+                </li>
+                <li className="flex items-center">
+                  <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                  Coach dashboard (for gyms)
+                </li>
+              </ul>
+              <Button className="w-full" size="lg" onClick={() => window.location.href = '/signup'}>
+                Get Started Free
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-br from-primary to-accent text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -261,7 +428,13 @@ export default function Landing() {
             <Button 
               variant="outline" 
               size="lg" 
-              className="border-white text-white hover:bg-white hover:text-primary"
+              className="border-white text-white hover:bg-white hover:text-primary bg-transparent"
+              onClick={() => {
+                const featuresSection = document.querySelector('#features');
+                if (featuresSection) {
+                  featuresSection.scrollIntoView({ behavior: 'smooth' });
+                }
+              }}
             >
               Learn More
             </Button>
@@ -286,9 +459,9 @@ export default function Landing() {
             <div>
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
+                <li><button onClick={() => {const elem = document.querySelector('#features'); elem?.scrollIntoView({behavior: 'smooth'});}} className="hover:text-primary transition-colors text-left">Features</button></li>
                 <li><a href="/community" className="hover:text-primary transition-colors">Community</a></li>
-                <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
+                <li><button onClick={() => {const elem = document.querySelector('#pricing'); elem?.scrollIntoView({behavior: 'smooth'});}} className="hover:text-primary transition-colors text-left">Pricing</button></li>
               </ul>
             </div>
             
