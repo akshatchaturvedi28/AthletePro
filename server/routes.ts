@@ -732,6 +732,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email routes for contact form and feedback
+  app.post('/api/send-email', async (req, res) => {
+    try {
+      const { name, email, subject, message, type } = req.body;
+
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      // Check if SendGrid is available
+      if (!process.env.SENDGRID_API_KEY) {
+        return res.status(503).json({ error: 'Email service not configured' });
+      }
+
+      const mailServiceModule = await import('@sendgrid/mail');
+      const mailService = mailServiceModule.default;
+      mailService.setApiKey(process.env.SENDGRID_API_KEY);
+
+      const emailContent = {
+        to: 'akshatchaturvedi17@gmail.com',
+        from: 'noreply@acrossfit.com', // This should be a verified sender in SendGrid
+        subject: type === 'feedback' ? `Anonymous Feedback: ${subject || 'No Subject'}` : `Contact Form: ${subject || 'No Subject'}`,
+        text: type === 'feedback' 
+          ? `Anonymous Feedback:\n\n${message}`
+          : `Name: ${name}\nEmail: ${email}\nSubject: ${subject}\n\nMessage:\n${message}`,
+        html: type === 'feedback'
+          ? `<h3>Anonymous Feedback</h3><p><strong>Message:</strong></p><p>${message.replace(/\n/g, '<br>')}</p>`
+          : `<h3>Contact Form Submission</h3>
+             <p><strong>Name:</strong> ${name}</p>
+             <p><strong>Email:</strong> ${email}</p>
+             <p><strong>Subject:</strong> ${subject}</p>
+             <p><strong>Message:</strong></p>
+             <p>${message.replace(/\n/g, '<br>')}</p>`
+      };
+
+      await mailService.send(emailContent);
+      
+      res.json({ success: true, message: 'Email sent successfully' });
+    } catch (error) {
+      console.error('SendGrid email error:', error);
+      res.status(500).json({ error: 'Failed to send email' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

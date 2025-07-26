@@ -11,6 +11,7 @@ import CommunityLanding from "@/pages/community-landing";
 import Contact from "@/pages/contact";
 import About from "@/pages/about";
 import Privacy from "@/pages/privacy";
+import Feedback from "@/pages/feedback";
 import NotFound from "@/pages/not-found";
 
 // Authentication Pages
@@ -65,6 +66,7 @@ function Router() {
           <Route path="/about" component={About} />
           <Route path="/contact" component={Contact} />
           <Route path="/privacy" component={Privacy} />
+          <Route path="/feedback" component={Feedback} />
           
           {/* Authentication Routes */}
           <Route path="/signin" component={UserSignIn} />

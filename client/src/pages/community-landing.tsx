@@ -519,6 +519,91 @@ export default function CommunityLanding() {
         </div>
       </section>
 
+      {/* Demo Section */}
+      <section id="demo" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-secondary mb-4">See ACrossFit in Action</h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Watch how easy it is to manage your CrossFit community with our comprehensive platform.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-8">
+              <div className="flex items-start space-x-4">
+                <div className="bg-primary rounded-full p-2 mt-1">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-secondary mb-2">Member Management</h3>
+                  <p className="text-gray-600">Add members, assign roles, and track engagement all from one dashboard.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-4">
+                <div className="bg-accent rounded-full p-2 mt-1">
+                  <Trophy className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-secondary mb-2">AI Workout Parsing</h3>
+                  <p className="text-gray-600">Simply paste workout descriptions and our AI automatically creates structured WODs.</p>
+                </div>
+              </div>
+              
+              <div className="flex items-start space-x-4">
+                <div className="bg-success rounded-full p-2 mt-1">
+                  <Target className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-secondary mb-2">Real-time Leaderboards</h3>
+                  <p className="text-gray-600">Keep your community motivated with automatic leaderboards and progress tracking.</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="relative">
+              <Card className="bg-white shadow-2xl border-0">
+                <CardContent className="p-0">
+                  <div className="bg-gradient-to-r from-primary to-accent p-4 text-white">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold">Community Dashboard</h4>
+                      <div className="flex space-x-1">
+                        <div className="w-3 h-3 bg-red-400 rounded-full"></div>
+                        <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                        <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="text-center p-4 bg-primary/5 rounded-lg">
+                        <div className="text-2xl font-bold text-primary">42</div>
+                        <div className="text-sm text-gray-600">Active Members</div>
+                      </div>
+                      <div className="text-center p-4 bg-accent/5 rounded-lg">
+                        <div className="text-2xl font-bold text-accent">156</div>
+                        <div className="text-sm text-gray-600">Workouts Logged</div>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <span className="font-medium">Today's WOD: "Fran"</span>
+                        <Badge variant="secondary">12 completed</Badge>
+                      </div>
+                      <div className="flex items-center justify-between p-3 border rounded-lg">
+                        <span className="font-medium">Weekly Challenge</span>
+                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-br from-primary to-accent text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -538,7 +623,10 @@ export default function CommunityLanding() {
             <Button 
               variant="outline" 
               size="lg" 
-              className="border-white text-white hover:bg-white hover:text-primary"
+              className="border-white text-white hover:bg-white hover:text-primary bg-transparent"
+              onClick={() => {
+                window.open('mailto:akshatchaturvedi17@gmail.com?subject=Schedule Demo Request&body=Hi, I would like to schedule a demo for ACrossFit community management platform.', '_blank');
+              }}
             >
               Schedule a Demo
             </Button>

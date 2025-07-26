@@ -479,6 +479,7 @@ export default function Landing() {
               <ul className="space-y-2 text-gray-400">
                 <li><a href="/contact" className="hover:text-primary transition-colors">Help Center</a></li>
                 <li><a href="/contact" className="hover:text-primary transition-colors">Contact Support</a></li>
+                <li><a href="/feedback" className="hover:text-primary transition-colors">Give Feedback</a></li>
               </ul>
             </div>
           </div>

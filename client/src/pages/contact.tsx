@@ -39,7 +39,32 @@ export default function Contact() {
     setIsSubmitting(true);
     
     try {
-      // Send email to akshatchaturvedi17@gmail.com
+      // Try to send email via API first
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          subject: formData.subject || "Contact Form Message",
+          message: formData.message,
+          type: 'contact'
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Message Sent!",
+          description: "Thank you for your message. We'll get back to you within 1 hour.",
+        });
+        setFormData({ name: "", email: "", subject: "", message: "" });
+      } else {
+        throw new Error('API failed');
+      }
+    } catch (error) {
+      // Fallback to mailto
       const emailBody = `
 Name: ${formData.name}
 Email: ${formData.email}
@@ -49,7 +74,6 @@ Message:
 ${formData.message}
       `.trim();
       
-      // Use mailto to open email client
       const mailtoUrl = `mailto:akshatchaturvedi17@gmail.com?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(emailBody)}`;
       window.open(mailtoUrl, '_blank');
       
@@ -59,12 +83,6 @@ ${formData.message}
       });
       
       setFormData({ name: "", email: "", subject: "", message: "" });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Please try again or contact us directly at akshatchaturvedi17@gmail.com",
-        variant: "destructive"
-      });
     } finally {
       setIsSubmitting(false);
     }

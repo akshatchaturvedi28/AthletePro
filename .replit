@@ -40,4 +40,4 @@ localPort = 8080
 externalPort = 80
 
 [agent]
-integrations = ["javascript_supabase==1.0.0"]
+integrations = ["javascript_supabase==1.0.0", "javascript_sendgrid==1.0.0"]
