@@ -17,12 +17,17 @@ function validateEnvironmentVariables() {
   
   // Validate authentication-related variables for production
   if (process.env.NODE_ENV === "production") {
-    const authRequired = ["SESSION_SECRET", "REPL_ID", "REPLIT_DOMAINS"];
-    const authMissing = authRequired.filter(env => !process.env[env]);
-    
-    if (authMissing.length > 0) {
-      console.error(`Missing required authentication environment variables for production: ${authMissing.join(", ")}`);
+    // SESSION_SECRET is always required
+    if (!process.env.SESSION_SECRET) {
+      console.error("Missing required SESSION_SECRET environment variable");
       process.exit(1);
+    }
+    
+    // REPL_ID and REPLIT_DOMAINS are optional - if missing, authentication will be disabled
+    const replitAuthMissing = !process.env.REPL_ID || !process.env.REPLIT_DOMAINS;
+    if (replitAuthMissing) {
+      console.warn("Replit authentication variables (REPL_ID, REPLIT_DOMAINS) not provided");
+      console.warn("Authentication will be disabled - application will run in restricted mode");
     }
   }
   

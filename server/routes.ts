@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, isReplitAuthAvailable } from "./replitAuth";
 
 // Helper to get the right auth middleware based on environment
 const getAuthMiddleware = () => {
@@ -21,6 +21,8 @@ const getAuthMiddleware = () => {
       next();
     };
   }
+  
+  // For production, use the isAuthenticated middleware which handles fallbacks internally
   return isAuthenticated;
 };
 import { WorkoutParser } from "./services/workoutParser";
@@ -41,6 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { setupLocalAuth } = await import("./localAuth.js");
     setupLocalAuth(app);
   } else {
+    // Setup auth will handle fallback if Replit auth is not available
     await setupAuth(app);
   }
 
@@ -104,17 +107,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Check if user is authenticated
-      if (process.env.NODE_ENV !== 'development' && (!req.isAuthenticated() || !req.user?.claims?.sub)) {
+      // Check if user is authenticated - allow guest users in production
+      if (!req.user?.claims?.sub) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
       const userId = req.user.claims.sub;
+      const isGuestUser = userId === 'guest-user';
       let user = await storage.getUser(userId);
       
-      // For development mode, create user if doesn't exist
-      if (!user && process.env.NODE_ENV === 'development') {
-        user = await storage.upsertUser({
+      // For development mode or guest users, create user if doesn't exist
+      if (!user && (process.env.NODE_ENV === 'development' || isGuestUser)) {
+        const userData = isGuestUser ? {
+          id: userId,
+          username: 'GuestUser',
+          email: 'guest@app.com',
+          phoneNumber: '+0000000000',
+          occupation: 'Guest',
+          bodyWeight: '70',
+          bodyHeight: '175',
+          yearsOfExperience: 0,
+          bio: 'Guest user for demonstration',
+          isRegistered: true,
+          registeredAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        } : {
           id: userId,
           username: 'LocalDevUser',
           email: 'dev@localhost.com',
@@ -128,15 +146,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           registeredAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date()
-        });
+        };
+        
+        user = await storage.upsertUser(userData);
       }
       
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // For development, always consider user as registered
-      if (process.env.NODE_ENV === 'development' && !user.isRegistered) {
+      // For development or guest users, always consider user as registered
+      if ((process.env.NODE_ENV === 'development' || isGuestUser) && !user.isRegistered) {
         const updatedUser = await storage.updateUser(userId, {
           isRegistered: true,
           registeredAt: new Date()
@@ -146,8 +166,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Check if user is properly registered (skip for development)
-      if (process.env.NODE_ENV !== 'development' && !user.isRegistered) {
+      // Check if user is properly registered (skip for development and guest users)
+      if (process.env.NODE_ENV !== 'development' && !isGuestUser && !user.isRegistered) {
         return res.status(403).json({ message: "User not registered", needsRegistration: true });
       }
       
@@ -156,7 +176,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         ...user,
-        membership: membership || null
+        membership: membership || null,
+        isGuest: isGuestUser
       });
     } catch (error) {
       console.error("Error fetching user:", error);

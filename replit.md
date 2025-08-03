@@ -10,6 +10,28 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**August 3, 2025 - Production Deployment Authentication Fixes**
+- **Conditional Replit Authentication**: Made Replit auth optional for deployment flexibility
+  - Added `isReplitAuthAvailable()` function to detect if Replit auth variables are configured
+  - Implemented graceful fallback when `REPL_ID` or `REPLIT_DOMAINS` are missing
+  - Updated environment variable validation to make Replit auth optional in production
+  
+- **Production Authentication Fallback**: Created guest mode for external deployments
+  - Built `productionAuth.ts` module for non-Replit deployments
+  - Automatic guest user creation when Replit auth is unavailable
+  - Full application functionality available in guest mode
+  - Session-based authentication with PostgreSQL storage
+  
+- **Enhanced Error Handling**: Improved authentication error management
+  - Added try-catch blocks around OIDC discovery calls
+  - Proper error messages when authentication services are unavailable
+  - Graceful degradation without breaking application startup
+  
+- **Deployment Documentation**: Created comprehensive deployment guide
+  - Documented environment variable requirements for different deployment scenarios
+  - Added troubleshooting section for common authentication issues
+  - Clear instructions for both Replit and external platform deployments
+
 **July 19, 2025 - Complete MVP Implementation with Authentication System**
 - **Comprehensive Authentication System**: Built complete auth flow for users and admins
   - Created separate sign-in/sign-up pages for athletes and admin users (coaches/managers)
@@ -102,6 +124,10 @@ Preferred communication style: Simple, everyday language.
 ## Key Components
 
 ### Authentication System
+- **Flexible Authentication Modes**: Supports both Replit OAuth and guest mode
+  - **Replit Authentication**: Full OAuth integration for Replit deployments
+  - **Guest Mode**: Fallback authentication for external deployments
+  - **Conditional Setup**: Automatically detects available authentication methods
 - **Multi-Channel Authentication**: Support for email and phone-based sign-in/sign-up
 - **Role-Based Access Control**: Separate authentication flows for athletes and admin users
 - **Password Security**: Bcrypt encryption with password reset via email/SMS OTP
@@ -186,7 +212,20 @@ Preferred communication style: Simple, everyday language.
 ### Environment Requirements
 - **DATABASE_URL**: PostgreSQL connection string (required)
 - **SESSION_SECRET**: Session encryption key (required)
-- **REPL_ID**: Replit environment identifier (required for auth)
+- **REPL_ID**: Replit environment identifier (optional - enables Replit OAuth)
+- **REPLIT_DOMAINS**: Comma-separated allowed domains (optional - required with REPL_ID)
 - **ISSUER_URL**: OpenID Connect issuer (defaults to Replit)
+
+### Deployment Modes
+1. **Replit Mode**: When `REPL_ID` and `REPLIT_DOMAINS` are provided
+   - Full Replit OAuth integration
+   - Multi-user authentication with proper user isolation
+   - Production-ready for Replit deployments
+
+2. **Guest Mode**: When Replit auth variables are missing
+   - Automatic guest user creation
+   - Full application functionality available
+   - Suitable for demos and external deployments
+   - Falls back gracefully without breaking the application
 
 The application is designed to be deployment-ready on Replit with automatic database provisioning and authentication integration. The modular architecture allows for easy scaling and feature additions while maintaining clean separation of concerns between frontend, backend, and data layers.
