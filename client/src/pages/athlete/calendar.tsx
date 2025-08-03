@@ -84,7 +84,7 @@ export default function AthleteCalendar() {
   const { data: communityWorkouts } = useQuery({
     queryKey: ["/api/workouts/community", user?.membership?.community?.id],
     retry: false,
-    enabled: isAuthenticated && user?.membership?.community?.id,
+    enabled: !!(isAuthenticated && user?.membership?.community?.id),
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
         toast({
