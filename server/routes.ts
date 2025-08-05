@@ -186,7 +186,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User registration endpoint
+  // User signup endpoint (creates new user)
+  app.post('/api/auth/signup', async (req, res) => {
+    try {
+      const { 
+        email, 
+        username, 
+        firstName, 
+        lastName,
+        phoneNumber, 
+        occupation, 
+        bodyWeight, 
+        bodyHeight, 
+        yearsOfExperience, 
+        bio 
+      } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      // Check if user already exists with this email
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      
+      // Check if username is taken
+      if (username) {
+        const userWithUsername = await storage.getUserByUsername(username);
+        if (userWithUsername) {
+          return res.status(400).json({ message: "Username is already taken" });
+        }
+      }
+      
+      // Create unique user ID
+      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create new user
+      const newUser = await storage.upsertUser({
+        id: userId,
+        email,
+        firstName,
+        lastName,
+        username,
+        phoneNumber,
+        occupation,
+        bodyWeight: bodyWeight ? parseFloat(bodyWeight).toString() : undefined,
+        bodyHeight: bodyHeight ? parseFloat(bodyHeight).toString() : undefined,
+        yearsOfExperience: yearsOfExperience ? parseInt(yearsOfExperience) : undefined,
+        bio,
+        isRegistered: true,
+        registeredAt: new Date()
+      });
+      
+      res.json({ 
+        message: "Account created successfully", 
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          username: newUser.username,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName
+        }
+      });
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create account" });
+    }
+  });
+
+  // User registration endpoint (for authenticated users)
   app.post('/api/auth/register', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

@@ -17,7 +17,10 @@ export default function UserSignUp() {
     email: '',
     password: '',
     confirmPassword: '',
+    firstName: '',
+    lastName: '',
     username: '',
+    phoneNumber: '',
     occupation: '',
     bodyWeight: '',
     bodyHeight: '',
@@ -98,14 +101,35 @@ export default function UserSignUp() {
     setError('');
 
     try {
-      // Registration logic would go here
-      console.log('User registration:', formData);
-      
-      // For now, redirect to sign in
-      window.location.href = '/signin';
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          username: formData.username,
+          firstName: formData.firstName || undefined,
+          lastName: formData.lastName || undefined,
+          phoneNumber: formData.phoneNumber || undefined,
+          occupation: formData.occupation || undefined,
+          bodyWeight: formData.bodyWeight || undefined,
+          bodyHeight: formData.bodyHeight || undefined,
+          yearsOfExperience: formData.yearsOfExperience || undefined,
+          bio: formData.bio || undefined
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Account created successfully, redirect to sign in
+        console.log('Account created successfully:', result.user);
+        window.location.href = '/signin?message=Account created successfully. Please sign in.';
+      } else {
+        throw new Error(result.message || 'Failed to create account');
+      }
       
     } catch (err) {
-      setError('Failed to create account. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
