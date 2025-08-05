@@ -94,8 +94,17 @@ export default function UserSignUp() {
   const sendVerificationCode = async (type: 'email' | 'phone') => {
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // Simulate sending verification code
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Show success message
+      alert(`Verification code sent to your ${type}!`);
+      
+      // In a real app, this would trigger actual email/SMS sending
+      console.log(`Sending verification code to ${type}: ${type === 'email' ? formData.email : formData.phone}`);
+      
+    } catch (error) {
+      alert(`Failed to send verification code to ${type}`);
     } finally {
       setIsLoading(false);
     }
@@ -219,7 +228,7 @@ export default function UserSignUp() {
                     <div>
                       <Label htmlFor="password">
                         Password
-                        <Info className="inline h-3 w-3 ml-1 text-gray-400" title="We store passwords in encrypted form using Bcrypt algorithm" />
+                        <Info className="inline h-3 w-3 ml-1 text-gray-400" />
                       </Label>
                       <Input
                         id="password"
@@ -389,7 +398,11 @@ export default function UserSignUp() {
                 </div>
 
                 <div className="mt-6 space-y-3">
-                  <Button variant="outline" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => window.location.href = '/api/login'}
+                  >
                     Continue with Google
                   </Button>
                   

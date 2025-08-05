@@ -47,7 +47,7 @@ export default function Landing() {
                 <Button 
                   size="lg" 
                   className="bg-primary hover:bg-primary/90 text-white"
-                  onClick={() => window.location.href = '/api/login'}
+                  onClick={() => window.location.href = '/signup'}
                 >
                   <Users className="h-5 w-5 mr-2" />
                   Sign Up Free
@@ -359,7 +359,7 @@ export default function Landing() {
             size="lg" 
             onClick={() => window.location.href = '/signup'}
           >
-            Start Your Free Trial
+            Get Started Free
           </Button>
         </div>
       </section>

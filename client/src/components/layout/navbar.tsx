@@ -43,9 +43,22 @@ export function Navbar() {
   const handleNavClick = (href: string) => {
     if (href.startsWith('#')) {
       // Handle anchor links by scrolling to section
-      const element = document.querySelector(href);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+      // First check if we're on the landing page
+      if (window.location.pathname !== '/') {
+        // Navigate to landing page first, then scroll
+        navigate('/');
+        setTimeout(() => {
+          const element = document.querySelector(href);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+      } else {
+        // Already on landing page, just scroll
+        const element = document.querySelector(href);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
       }
     } else {
       // Handle regular navigation

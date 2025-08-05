@@ -116,7 +116,7 @@ export default function AdminSignUp() {
                   <div>
                     <Label htmlFor="password">
                       Password
-                      <Info className="inline h-3 w-3 ml-1 text-gray-400" title="We store passwords in encrypted form using Bcrypt algorithm" />
+                      <Info className="inline h-3 w-3 ml-1 text-gray-400" />
                     </Label>
                     <Input
                       id="password"
@@ -293,7 +293,11 @@ export default function AdminSignUp() {
                 </div>
 
                 <div className="mt-6 space-y-3">
-                  <Button variant="outline" className="w-full">
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => window.location.href = '/api/login'}
+                  >
                     Continue with Google
                   </Button>
                   
