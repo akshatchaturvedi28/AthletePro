@@ -190,13 +190,11 @@ export default function UserSignUp() {
       const result = await response.json();
       
       if (response.ok) {
-        // Verification successful - complete signup
+        // Verification successful - proceed to next step
         setFormData(prev => ({ ...prev, emailVerified: true }));
-        alert('✅ Email verified! Account created successfully.');
-        console.log('User registration completed:', formData);
-        
-        // Redirect to sign in
-        window.location.href = '/signin';
+        setShowVerification(false);
+        setStep(2); // Move to personal information step
+        setError('');
       } else {
         throw new Error(result.error || 'Verification failed');
       }
@@ -347,6 +345,33 @@ export default function UserSignUp() {
 
                 {step === 2 && (
                   <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          type="text"
+                          value={formData.firstName}
+                          onChange={(e) => setFormData(prev => ({...prev, firstName: e.target.value}))}
+                          required
+                          placeholder="John"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          type="text"
+                          value={formData.lastName}
+                          onChange={(e) => setFormData(prev => ({...prev, lastName: e.target.value}))}
+                          required
+                          placeholder="Doe"
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+
                     <div>
                       <Label htmlFor="username">Username</Label>
                       <Input
@@ -356,6 +381,18 @@ export default function UserSignUp() {
                         onChange={(e) => setFormData(prev => ({...prev, username: e.target.value}))}
                         required
                         placeholder="athlete123"
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="phoneNumber">Phone Number (Optional)</Label>
+                      <Input
+                        id="phoneNumber"
+                        type="tel"
+                        value={formData.phoneNumber}
+                        onChange={(e) => setFormData(prev => ({...prev, phoneNumber: e.target.value}))}
+                        placeholder="(555) 123-4567"
                         className="mt-1"
                       />
                     </div>
