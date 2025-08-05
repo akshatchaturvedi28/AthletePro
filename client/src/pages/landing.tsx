@@ -420,7 +420,7 @@ export default function Landing() {
             <Button 
               size="lg" 
               className="bg-white text-primary hover:bg-white/90"
-              onClick={() => window.location.href = '/api/login'}
+              onClick={() => window.location.href = '/signup'}
             >
               Get Started Free
               <ArrowRight className="h-5 w-5 ml-2" />

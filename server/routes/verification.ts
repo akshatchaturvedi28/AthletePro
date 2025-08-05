@@ -3,8 +3,14 @@ import sgMail from '@sendgrid/mail';
 
 const router = Router();
 
-// In production, you would get this from environment variables
-// sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
+// Configure SendGrid with API key
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
+if (SENDGRID_API_KEY) {
+  sgMail.setApiKey(SENDGRID_API_KEY);
+  console.log('✅ SendGrid configured for email verification');
+} else {
+  console.log('⚠️  SendGrid API key not found - using demo mode for verification codes');
+}
 
 // Temporary store for verification codes (in production, use Redis or database)
 const verificationCodes = new Map<string, { code: string; expires: number; type: 'email' | 'phone' }>();
@@ -29,18 +35,37 @@ router.post('/send-email-code', async (req, res) => {
     // Store the code
     verificationCodes.set(email, { code, expires, type: 'email' });
     
-    // In a real app, you would send via SendGrid
-    // const msg = {
-    //   to: email,
-    //   from: 'noreply@acrossfit.com',
-    //   subject: 'ACrossFit - Verification Code',
-    //   text: `Your verification code is: ${code}`,
-    //   html: `<strong>Your verification code is: ${code}</strong>`,
-    // };
-    // await sgMail.send(msg);
-    
-    // For demo purposes, log the code
-    console.log(`📧 Email verification code for ${email}: ${code}`);
+    // Try to send via SendGrid if configured
+    if (SENDGRID_API_KEY) {
+      try {
+        const msg = {
+          to: email,
+          from: 'noreply@acrossfit.com', // In production, use a verified sender
+          subject: 'ACrossFit - Verification Code',
+          text: `Your verification code is: ${code}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #FF6B35;">ACrossFit Verification</h2>
+              <p>Your verification code is:</p>
+              <div style="font-size: 24px; font-weight: bold; background: #f5f5f5; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+                ${code}
+              </div>
+              <p>This code will expire in 10 minutes.</p>
+              <p style="color: #666; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
+            </div>
+          `,
+        };
+        await sgMail.send(msg);
+        console.log(`✅ Email verification code sent to ${email}`);
+      } catch (error) {
+        console.error('❌ SendGrid error:', error);
+        // Fall back to demo mode
+        console.log(`📧 [DEMO] Email verification code for ${email}: ${code}`);
+      }
+    } else {
+      // Demo mode - log the code
+      console.log(`📧 [DEMO] Email verification code for ${email}: ${code}`);
+    }
     
     res.json({ success: true, message: 'Verification code sent to email' });
   } catch (error) {
@@ -64,9 +89,9 @@ router.post('/send-sms-code', async (req, res) => {
     // Store the code
     verificationCodes.set(phone, { code, expires, type: 'phone' });
     
-    // In a real app, you would use Twilio or similar SMS service
-    // For demo purposes, log the code
-    console.log(`📱 SMS verification code for ${phone}: ${code}`);
+    // For SMS, we'll use demo mode (in production, integrate Twilio)
+    // This simulates sending an SMS verification code
+    console.log(`📱 [DEMO] SMS verification code for ${phone}: ${code}`);
     
     res.json({ success: true, message: 'Verification code sent to phone' });
   } catch (error) {

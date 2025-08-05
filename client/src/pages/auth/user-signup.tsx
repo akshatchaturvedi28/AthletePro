@@ -121,7 +121,7 @@ export default function UserSignUp() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(`✅ Verification code sent to your ${type}!`);
+        alert(`✅ Verification code sent to your ${type}!\n\nCheck the console logs to see the demo code (in production this would be sent via ${type === 'email' ? 'email' : 'SMS'}).`);
         console.log(`Verification code sent to ${type === 'email' ? formData.email : formData.phone}`);
       } else {
         throw new Error(result.error || 'Failed to send code');
