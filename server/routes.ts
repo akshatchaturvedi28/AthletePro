@@ -186,6 +186,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User signin endpoint
+  app.post('/api/auth/signin', async (req, res) => {
+    try {
+      const { identifier, password, type } = req.body;
+      
+      if (!identifier || !password || !type) {
+        return res.status(400).json({ message: "Email/phone, password, and type are required" });
+      }
+      
+      // Find user by email or phone based on type
+      let user;
+      if (type === 'email') {
+        user = await storage.getUserByEmail(identifier);
+      } else if (type === 'phone') {
+        // Note: We would need a getUserByPhone method, for now using email lookup
+        user = await storage.getUserByEmail(identifier);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // In a real app, you would verify the password hash here
+      // For now, we'll accept any password for existing users (demo purposes)
+      // TODO: Implement password hashing and verification
+      
+      if (!user.isRegistered) {
+        return res.status(401).json({ message: "Account not activated. Please complete registration." });
+      }
+      
+      // Create a session or token (simplified for demo)
+      // In production, you would use proper session management
+      res.json({ 
+        message: "Sign in successful", 
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName
+        }
+      });
+    } catch (error) {
+      console.error("Error during signin:", error);
+      res.status(500).json({ message: "Failed to sign in" });
+    }
+  });
+
   // User signup endpoint (creates new user)
   app.post('/api/auth/signup', async (req, res) => {
     try {

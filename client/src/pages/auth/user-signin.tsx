@@ -25,16 +25,39 @@ export default function UserSignIn() {
     setError('');
 
     try {
-      // For local development, redirect to athlete dashboard
-      if (process.env.NODE_ENV === 'development') {
+      const identifier = signInMethod === 'email' ? formData.email : formData.phone;
+      const password = formData.password;
+
+      if (!identifier) {
+        throw new Error(`Please enter your ${signInMethod}`);
+      }
+      if (!password) {
+        throw new Error('Please enter your password');
+      }
+
+      // Call the authentication API
+      const response = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier,
+          password,
+          type: signInMethod
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Authentication successful, redirect to dashboard
+        console.log('Sign in successful:', result.user);
         window.location.href = '/dashboard';
-        return;
+      } else {
+        throw new Error(result.message || 'Invalid credentials');
       }
       
-      // Production authentication logic would go here
-      
     } catch (err) {
-      setError('Failed to sign in. Please check your credentials.');
+      setError(err instanceof Error ? err.message : 'Failed to sign in. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
