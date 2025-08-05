@@ -13,6 +13,9 @@ This guide explains how to deploy the CrossFit community management platform.
 - `REPLIT_DOMAINS` - Comma-separated list of allowed domains for authentication
 - `ISSUER_URL` - OAuth issuer URL (defaults to "https://replit.com/oidc")
 
+### Optional Variables (Email Service)
+- `SENDGRID_API_KEY` - SendGrid API key for email verification (if not provided, verification codes will be logged to console)
+
 ## Authentication Modes
 
 ### 1. Replit Authentication (Recommended for Replit Deployments)
@@ -40,13 +43,19 @@ SESSION_SECRET=your-secure-session-secret
 ## Deployment Steps
 
 ### 1. On Replit
-1. Set the required environment variables in Replit Secrets
+1. Set the required environment variables in Replit Secrets:
+   - `DATABASE_URL` (auto-created if using Replit Database)
+   - `SESSION_SECRET`
+   - `SENDGRID_API_KEY` (optional, for email verification)
 2. Click the "Deploy" button in your Repl
 3. The application will automatically detect Replit environment and enable OAuth
 
 ### 2. On External Platforms (Cloud Run, Heroku, etc.)
 1. Set up a PostgreSQL database
-2. Set `DATABASE_URL` and `SESSION_SECRET` environment variables
+2. Set required environment variables:
+   - `DATABASE_URL` - your PostgreSQL connection string
+   - `SESSION_SECRET` - secure random string for session encryption
+   - `SENDGRID_API_KEY` - your SendGrid API key (optional)
 3. Optionally set Replit auth variables if you have them
 4. Deploy the application
 5. The app will automatically run in guest mode if Replit auth is not configured
