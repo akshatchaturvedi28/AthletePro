@@ -142,6 +142,47 @@ export default function UserSignUp() {
     }
   };
 
+  const handleVerifyCode = async () => {
+    if (!formData.verificationCode) {
+      setError('Please enter the verification code');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // Verify the code with the backend
+      const response = await fetch('/api/verification/verify-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: formData.email,
+          code: formData.verificationCode,
+          type: 'email'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        // Verification successful - complete signup
+        setFormData(prev => ({ ...prev, emailVerified: true }));
+        alert('✅ Email verified! Account created successfully.');
+        console.log('User registration completed:', formData);
+        
+        // Redirect to sign in
+        window.location.href = '/signin';
+      } else {
+        throw new Error(result.error || 'Verification failed');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid verification code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -209,7 +250,7 @@ export default function UserSignUp() {
                 )}
 
                 <Button
-                  onClick={handleSubmit}
+                  onClick={handleVerifyCode}
                   className="w-full"
                   disabled={isLoading}
                 >
