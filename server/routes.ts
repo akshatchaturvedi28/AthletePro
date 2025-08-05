@@ -187,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User signin endpoint
-  app.post('/api/auth/signin', async (req, res) => {
+  app.post('/api/auth/signin', async (req: any, res) => {
     try {
       const { identifier, password, type } = req.body;
       
@@ -216,8 +216,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Account not activated. Please complete registration." });
       }
       
-      // Create a session or token (simplified for demo)
-      // In production, you would use proper session management
+      // Create a session for the authenticated user
+      if (req.session) {
+        req.session.user = {
+          claims: {
+            sub: user.id,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username,
+            email: user.email
+          }
+        };
+      }
+      
       res.json({ 
         message: "Sign in successful", 
         user: {

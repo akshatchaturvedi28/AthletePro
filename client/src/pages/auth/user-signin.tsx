@@ -39,6 +39,7 @@ export default function UserSignIn() {
       const response = await fetch('/api/auth/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           identifier,
           password,
@@ -49,7 +50,7 @@ export default function UserSignIn() {
       const result = await response.json();
 
       if (response.ok) {
-        // Authentication successful, redirect to dashboard
+        // Authentication successful, force reload to refresh auth state
         console.log('Sign in successful:', result.user);
         window.location.href = '/dashboard';
       } else {
