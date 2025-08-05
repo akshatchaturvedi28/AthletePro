@@ -78,10 +78,18 @@ router.post("/send-email-code", async (req, res) => {
         };
         await sgMail.send(msg);
         console.log(`✅ Email verification code sent to ${email}`);
-      } catch (error) {
+      } catch (error: any) {
         console.error("❌ SendGrid error:", error);
-        // Fall back to demo mode
-        console.log(`📧 [DEMO] Email verification code for ${email}: ${code}`);
+        if (error?.code === 403) {
+          console.error("💡 SendGrid 403 Forbidden Error - How to fix:");
+          console.error("   1. Go to SendGrid → Settings → Sender Authentication");
+          console.error("   2. Verify the sender email: akshatchat2809@gmail.com");
+          console.error("   3. OR change the 'from' email to your verified sender");
+          console.error("   4. Check that your API key has 'Mail Send' permissions");
+        }
+        // Fall back to demo mode with the actual code for testing
+        console.log(`📧 [DEMO - SendGrid Failed] Verification code for ${email}: ${code}`);
+        console.log(`🔑 Copy this code to continue: ${code}`);
       }
     } else {
       // Demo mode - log the code

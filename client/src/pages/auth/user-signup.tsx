@@ -125,7 +125,7 @@ export default function UserSignUp() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(`✅ Verification code sent to your email!\n\nCheck your email inbox for the verification code. If you don't see it, check your spam folder.`);
+        alert(`✅ Verification code sent to your email!\n\nIf SendGrid is not configured, check the server console logs for the demo verification code.`);
         console.log(`Verification code sent to ${formData.email}`);
       } else {
         throw new Error(result.error || 'Failed to send code');
