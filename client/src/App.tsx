@@ -102,7 +102,9 @@ function Router() {
               <Route path="/profile" component={AthleteProfile} />
               <Route path="/progress" component={AthleteProgress} />
               <Route path="/account" component={AthleteAccount} />
-              <Route path="/athlete/:id" component={PublicProfile} />
+              <Route path="/athlete/:id">
+            {(params) => <PublicProfile athleteId={params.id} />}
+          </Route>
             </>
           )}
           <Route path="/about" component={About} />

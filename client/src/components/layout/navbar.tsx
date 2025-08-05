@@ -29,7 +29,7 @@ export function Navbar() {
   };
 
   const handleLogin = () => {
-    window.location.href = '/api/login';
+    navigate('/signin');
   };
 
   const navigationItems = [

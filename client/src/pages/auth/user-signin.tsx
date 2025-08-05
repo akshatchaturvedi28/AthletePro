@@ -143,7 +143,11 @@ export default function UserSignIn() {
               </div>
 
               <div className="mt-6 space-y-3">
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => window.location.href = '/api/login'}
+                >
                   Continue with Google
                 </Button>
                 
