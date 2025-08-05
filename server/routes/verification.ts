@@ -61,7 +61,7 @@ router.post("/send-email-code", async (req, res) => {
       try {
         const msg = {
           to: email,
-          from: "akshatchat2809@gmail.com", // In production, use a verified sender
+          from: "no-reply@acrossfit.com", // In production, use a verified sender
           subject: "ACrossFit - Verification Code",
           text: `Your verification code is: ${code}`,
           html: `
