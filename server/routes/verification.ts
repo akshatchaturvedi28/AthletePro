@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import sgMail from '@sendgrid/mail';
+import twilio from 'twilio';
 
 const router = Router();
 
@@ -10,6 +11,19 @@ if (SENDGRID_API_KEY) {
   console.log('✅ SendGrid configured for email verification');
 } else {
   console.log('⚠️  SendGrid API key not found - using demo mode for verification codes');
+}
+
+// Configure Twilio for SMS
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+
+let twilioClient: any = null;
+if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER) {
+  twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+  console.log('✅ Twilio configured for SMS verification');
+} else {
+  console.log('⚠️  Twilio credentials not found - using demo mode for SMS codes');
 }
 
 // Temporary store for verification codes (in production, use Redis or database)
@@ -89,9 +103,24 @@ router.post('/send-sms-code', async (req, res) => {
     // Store the code
     verificationCodes.set(phone, { code, expires, type: 'phone' });
     
-    // For SMS, we'll use demo mode (in production, integrate Twilio)
-    // This simulates sending an SMS verification code
-    console.log(`📱 [DEMO] SMS verification code for ${phone}: ${code}`);
+    // Try to send via Twilio if configured
+    if (twilioClient && TWILIO_PHONE_NUMBER) {
+      try {
+        await twilioClient.messages.create({
+          body: `Your ACrossFit verification code is: ${code}. This code expires in 10 minutes.`,
+          from: TWILIO_PHONE_NUMBER,
+          to: phone
+        });
+        console.log(`✅ SMS verification code sent to ${phone}`);
+      } catch (error) {
+        console.error('❌ Twilio error:', error);
+        // Fall back to demo mode
+        console.log(`📱 [DEMO] SMS verification code for ${phone}: ${code}`);
+      }
+    } else {
+      // Demo mode - log the code
+      console.log(`📱 [DEMO] SMS verification code for ${phone}: ${code}`);
+    }
     
     res.json({ success: true, message: 'Verification code sent to phone' });
   } catch (error) {

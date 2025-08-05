@@ -17,7 +17,6 @@ export default function UserSignUp() {
     email: '',
     password: '',
     confirmPassword: '',
-    phone: '',
     username: '',
     occupation: '',
     bodyWeight: '',
@@ -26,7 +25,6 @@ export default function UserSignUp() {
     bio: '',
     agreedToTerms: false,
     emailVerified: false,
-    phoneVerified: false,
     verificationCode: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +45,13 @@ export default function UserSignUp() {
       }
       
       setError('');
-      setShowVerification(true);
+      // Send verification code automatically
+      try {
+        await sendVerificationCode();
+        setShowVerification(true);
+      } catch (error) {
+        setError('Failed to send verification code');
+      }
       return;
     }
 
@@ -69,7 +73,7 @@ export default function UserSignUp() {
         const result = await response.json();
         
         if (response.ok) {
-          setFormData(prev => ({ ...prev, emailVerified: true, phoneVerified: true }));
+          setFormData(prev => ({ ...prev, emailVerified: true }));
           setShowVerification(false);
           setStep(2);
         } else {
@@ -106,11 +110,11 @@ export default function UserSignUp() {
     }
   };
 
-  const sendVerificationCode = async (type: 'email' | 'phone') => {
+  const sendVerificationCode = async () => {
     setIsLoading(true);
     try {
-      const endpoint = type === 'email' ? '/api/verification/send-email-code' : '/api/verification/send-sms-code';
-      const data = type === 'email' ? { email: formData.email } : { phone: formData.phone };
+      const endpoint = '/api/verification/send-email-code';
+      const data = { email: formData.email };
       
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -121,15 +125,15 @@ export default function UserSignUp() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(`✅ Verification code sent to your ${type}!\n\nCheck the console logs to see the demo code (in production this would be sent via ${type === 'email' ? 'email' : 'SMS'}).`);
-        console.log(`Verification code sent to ${type === 'email' ? formData.email : formData.phone}`);
+        alert(`✅ Verification code sent to your email!\n\nCheck your email inbox for the verification code. If you don't see it, check your spam folder.`);
+        console.log(`Verification code sent to ${formData.email}`);
       } else {
         throw new Error(result.error || 'Failed to send code');
       }
       
     } catch (error) {
       console.error('Verification error:', error);
-      alert(`❌ Failed to send verification code to ${type}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(`❌ Failed to send verification code: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -167,7 +171,7 @@ export default function UserSignUp() {
                 <div className="text-center">
                   <h3 className="text-lg font-medium">Verify Your Account</h3>
                   <p className="text-sm text-gray-600 mt-2">
-                    We've sent verification codes to your email and phone
+                    We've sent a verification code to your email
                   </p>
                 </div>
 
@@ -184,26 +188,16 @@ export default function UserSignUp() {
                   />
                 </div>
 
-                <div className="flex space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sendVerificationCode('email')}
-                    disabled={isLoading}
-                  >
-                    Resend Email Code
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sendVerificationCode('phone')}
-                    disabled={isLoading}
-                  >
-                    Resend SMS Code
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={sendVerificationCode}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  Resend Email Code
+                </Button>
 
                 {error && (
                   <Alert variant="destructive">
@@ -236,19 +230,7 @@ export default function UserSignUp() {
                       />
                     </div>
 
-                    <div>
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => setFormData(prev => ({...prev, phone: e.target.value}))}
-                        required
-                        placeholder="+1 (555) 123-4567"
-                        className="mt-1"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Mobile OTP verification required</p>
-                    </div>
+
 
                     <div>
                       <Label htmlFor="password">
