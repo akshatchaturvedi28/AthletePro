@@ -30,6 +30,7 @@ export default function UserSignUp() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showVerification, setShowVerification] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,7 +126,9 @@ export default function UserSignUp() {
       const result = await response.json();
       
       if (response.ok) {
-        alert(`✅ Verification code sent to your email!\n\nIf SendGrid is not configured, check the server console logs for the demo verification code.`);
+        // Show success message and enable verification input
+        setEmailSent(true);
+        alert(`✅ Verification code sent to ${formData.email}!\n\nCheck your email inbox. If using demo mode, check the server console for the verification code.`);
         console.log(`Verification code sent to ${formData.email}`);
       } else {
         throw new Error(result.error || 'Failed to send code');
