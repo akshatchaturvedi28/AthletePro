@@ -654,9 +654,9 @@ export default function CommunityLanding() {
             <div>
               <h3 className="font-semibold mb-4">Product</h3>
               <ul className="space-y-2 text-gray-400">
-                <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
-                <li><a href="/api/login" className="hover:text-primary transition-colors">Get Started</a></li>
+                <li><button onClick={() => { window.location.href = '/#features'; }} className="hover:text-primary transition-colors text-left">Features</button></li>
+                <li><button onClick={() => { window.location.href = '/#pricing'; }} className="hover:text-primary transition-colors text-left">Pricing</button></li>
+                <li><a href="/signup" className="hover:text-primary transition-colors">Get Started</a></li>
               </ul>
             </div>
             

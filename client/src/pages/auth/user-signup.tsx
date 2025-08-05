@@ -51,17 +51,32 @@ export default function UserSignUp() {
       return;
     }
 
-    if (step === 2 && showVerification) {
+    if (showVerification) {
       // Handle email/phone verification
       setIsLoading(true);
       try {
-        // Simulate verification
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setFormData(prev => ({ ...prev, emailVerified: true, phoneVerified: true }));
-        setShowVerification(false);
-        setStep(2);
+        // Verify the code with the backend
+        const response = await fetch('/api/verification/verify-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            identifier: formData.email, // Use email as primary identifier
+            code: formData.verificationCode,
+            type: 'email'
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+          setFormData(prev => ({ ...prev, emailVerified: true, phoneVerified: true }));
+          setShowVerification(false);
+          setStep(2);
+        } else {
+          throw new Error(result.error || 'Verification failed');
+        }
       } catch (err) {
-        setError('Invalid verification code');
+        setError(err instanceof Error ? err.message : 'Invalid verification code');
       } finally {
         setIsLoading(false);
       }
@@ -94,17 +109,27 @@ export default function UserSignUp() {
   const sendVerificationCode = async (type: 'email' | 'phone') => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const endpoint = type === 'email' ? '/api/verification/send-email-code' : '/api/verification/send-sms-code';
+      const data = type === 'email' ? { email: formData.email } : { phone: formData.phone };
       
-      // Show success message
-      alert(`Verification code sent to your ${type}!`);
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
       
-      // In a real app, this would trigger actual email/SMS sending
-      console.log(`Sending verification code to ${type}: ${type === 'email' ? formData.email : formData.phone}`);
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`✅ Verification code sent to your ${type}!`);
+        console.log(`Verification code sent to ${type === 'email' ? formData.email : formData.phone}`);
+      } else {
+        throw new Error(result.error || 'Failed to send code');
+      }
       
     } catch (error) {
-      alert(`Failed to send verification code to ${type}`);
+      console.error('Verification error:', error);
+      alert(`❌ Failed to send verification code to ${type}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }

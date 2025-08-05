@@ -28,6 +28,7 @@ const getAuthMiddleware = () => {
 import { WorkoutParser } from "./services/workoutParser";
 import { ProgressTracker } from "./services/progressTracker";
 import { BENCHMARK_WORKOUTS } from "./data/benchmarkWorkouts";
+import { verificationRouter } from "./routes/verification.js";
 import { 
   insertCommunitySchema,
   insertWorkoutSchema,
@@ -708,6 +709,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch attendance" });
     }
   });
+
+  // Verification routes
+  app.use('/api/verification', verificationRouter);
 
   // Community goals routes
   app.post('/api/communities/:id/goals', authMiddleware, async (req: any, res) => {

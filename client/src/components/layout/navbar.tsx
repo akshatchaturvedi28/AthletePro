@@ -156,7 +156,7 @@ export function Navbar() {
                   Sign In
                 </Button>
                 <Button
-                  onClick={handleLogin}
+                  onClick={() => window.location.href = '/signup'}
                   className="bg-primary text-white hover:bg-primary/90"
                 >
                   Sign Up FREE
