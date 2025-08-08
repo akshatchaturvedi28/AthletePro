@@ -477,6 +477,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin session check endpoint
+  app.get('/api/auth/admin-session', async (req: any, res) => {
+    try {
+      const user = req.session?.user;
+      
+      if (!user || !user.claims) {
+        return res.status(401).json({ message: "Not authenticated as admin" });
+      }
+      
+      // Verify this is an admin user
+      const userId = user.claims.sub;
+      if (!userId.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.claims.role || '')) {
+        return res.status(401).json({ message: "Not authorized for admin access" });
+      }
+      
+      res.json({ 
+        user: {
+          id: user.claims.sub,
+          email: user.claims.email,
+          name: user.claims.name,
+          role: user.claims.role || 'Coach'
+        }
+      });
+    } catch (error) {
+      console.error("Error checking admin session:", error);
+      res.status(500).json({ message: "Failed to check admin session" });
+    }
+  });
+
   // Logout endpoint
   app.post('/api/auth/logout', (req: any, res) => {
     try {

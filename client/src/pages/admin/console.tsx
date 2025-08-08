@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,8 +9,37 @@ import { Users, Dumbbell, BarChart, Settings, Activity, TrendingUp, LogOut, User
 import { Navbar } from "@/components/layout/navbar";
 
 export default function AdminConsole() {
-  const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState("overview");
+  const [adminUser, setAdminUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check admin authentication on component mount
+  useEffect(() => {
+    const checkAdminAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/admin-session', {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAdminUser(data.user);
+        } else {
+          // Not authenticated as admin, redirect to signin
+          window.location.href = '/admin/signin';
+          return;
+        }
+      } catch (error) {
+        console.error('Admin auth check failed:', error);
+        window.location.href = '/admin/signin';
+        return;
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAdminAuth();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -20,28 +49,35 @@ export default function AdminConsole() {
       });
       
       if (response.ok) {
-        // Redirect to admin signin page after successful logout
         window.location.href = '/admin/signin?message=Successfully logged out';
       } else {
         console.error('Logout failed');
-        // Still redirect to be safe
         window.location.href = '/admin/signin';
       }
     } catch (error) {
       console.error('Logout error:', error);
-      // Redirect to signin page even if logout request fails
       window.location.href = '/admin/signin';
     }
   };
 
-  if (!user?.membership || (user.membership.role !== "manager" && user.membership.role !== "coach")) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!adminUser) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <Navbar />
         <div className="container mx-auto px-4 py-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
             <p className="text-gray-600">You don't have permission to access the admin console.</p>
+            <Button onClick={() => window.location.href = '/admin/signin'} className="mt-4">
+              Go to Admin Sign In
+            </Button>
           </div>
         </div>
       </div>
@@ -58,10 +94,10 @@ export default function AdminConsole() {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Console</h1>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="capitalize">
-                  {user.membership?.role || 'Admin'}
+                  {adminUser?.role || 'Admin'}
                 </Badge>
                 <span className="text-gray-600">
-                  {user.membership?.community?.name || user.email}
+                  {adminUser?.email}
                 </span>
               </div>
             </div>
@@ -70,7 +106,7 @@ export default function AdminConsole() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {user.firstName || user.username || 'Admin'}
+                  {adminUser?.name || 'Admin'}
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
