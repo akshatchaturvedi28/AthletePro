@@ -73,6 +73,11 @@ function Router() {
           <Route path="/signup" component={UserSignUp} />
           <Route path="/admin/signin" component={AdminSignIn} />
           <Route path="/admin/signup" component={AdminSignUp} />
+          <Route path="/admin" component={AdminSignIn} />
+          <Route path="/admin/console" component={AdminConsole} />
+          <Route path="/admin/coach" component={CoachDashboard} />
+          <Route path="/admin/account" component={AdminAccount} />
+          <Route path="/admin/manage-community" component={ManageCommunity} />
           <Route path="/forgot-password" component={() => <ForgotPassword userType="user" />} />
           <Route path="/admin/forgot-password" component={() => <ForgotPassword userType="admin" />} />
           <Route path="/admin/create-community" component={CreateCommunity} />

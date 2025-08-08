@@ -51,7 +51,8 @@ export default function AdminSignIn() {
 
       if (response.ok) {
         console.log('Admin sign in successful:', result.user);
-        window.location.href = '/admin';
+        // Redirect to admin console after successful login
+        window.location.href = '/admin/console';
       } else {
         throw new Error(result.message || 'Invalid credentials');
       }
