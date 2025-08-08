@@ -477,6 +477,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Logout endpoint
+  app.post('/api/auth/logout', (req: any, res) => {
+    try {
+      if (req.session) {
+        req.session.destroy((err: any) => {
+          if (err) {
+            console.error('Session destruction error:', err);
+            return res.status(500).json({ message: 'Failed to logout' });
+          }
+          res.clearCookie('connect.sid');
+          res.json({ message: 'Successfully logged out' });
+        });
+      } else {
+        res.json({ message: 'No active session found' });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({ message: 'Failed to logout' });
+    }
+  });
+
   // User registration endpoint (for authenticated users)
   app.post('/api/auth/register', authMiddleware, async (req: any, res) => {
     try {

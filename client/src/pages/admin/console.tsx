@@ -4,12 +4,35 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Dumbbell, BarChart, Settings, Activity, TrendingUp } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Users, Dumbbell, BarChart, Settings, Activity, TrendingUp, LogOut, User, ChevronDown } from "lucide-react";
 import { Navbar } from "@/components/layout/navbar";
 
 export default function AdminConsole() {
   const { user } = useAuth();
   const [selectedTab, setSelectedTab] = useState("overview");
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        // Redirect to admin signin page after successful logout
+        window.location.href = '/admin/signin?message=Successfully logged out';
+      } else {
+        console.error('Logout failed');
+        // Still redirect to be safe
+        window.location.href = '/admin/signin';
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Redirect to signin page even if logout request fails
+      window.location.href = '/admin/signin';
+    }
+  };
 
   if (!user?.membership || (user.membership.role !== "manager" && user.membership.role !== "coach")) {
     return (
@@ -30,14 +53,38 @@ export default function AdminConsole() {
       <Navbar />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Console</h1>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="capitalize">
-              {user.membership.role}
-            </Badge>
-            <span className="text-gray-600">
-              {user.membership.community.name}
-            </span>
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Console</h1>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="capitalize">
+                  {user.membership?.role || 'Admin'}
+                </Badge>
+                <span className="text-gray-600">
+                  {user.membership?.community?.name || user.email}
+                </span>
+              </div>
+            </div>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  {user.firstName || user.username || 'Admin'}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => window.location.href = '/admin/account'}>
+                  <User className="h-4 w-4 mr-2" />
+                  Account Settings
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

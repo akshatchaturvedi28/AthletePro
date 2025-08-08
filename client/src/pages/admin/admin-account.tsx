@@ -62,6 +62,25 @@ export default function AdminAccount() {
     console.log('Saving profile:', formData);
   };
 
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        window.location.href = '/admin/signin?message=Successfully logged out';
+      } else {
+        console.error('Logout failed');
+        window.location.href = '/admin/signin';
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      window.location.href = '/admin/signin';
+    }
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       {/* Header */}
@@ -70,9 +89,14 @@ export default function AdminAccount() {
           <h1 className="text-3xl font-bold text-gray-900">My Admin Account</h1>
           <p className="text-gray-600">Manage your account settings and preferences</p>
         </div>
-        <Badge variant="outline" className="capitalize">
-          Coach
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="capitalize">
+            Coach
+          </Badge>
+          <Button variant="outline" onClick={handleLogout} className="text-red-600 hover:text-red-700">
+            Logout
+          </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

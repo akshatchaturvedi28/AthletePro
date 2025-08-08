@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -27,7 +28,10 @@ import {
   CheckCircle,
   XCircle,
   Star,
-  NotebookPen
+  NotebookPen,
+  LogOut,
+  User,
+  ChevronDown
 } from "lucide-react";
 
 interface Athlete {
@@ -66,6 +70,25 @@ export default function CoachDashboard() {
   const [showCreateWOD, setShowCreateWOD] = useState(false);
   const [showAttendance, setShowAttendance] = useState(false);
   const [selectedAthlete, setSelectedAthlete] = useState<Athlete | null>(null);
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        window.location.href = '/admin/signin?message=Successfully logged out';
+      } else {
+        console.error('Logout failed');
+        window.location.href = '/admin/signin';
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      window.location.href = '/admin/signin';
+    }
+  };
 
   // Fetch athletes
   const { data: athletes = [], isLoading: athletesLoading } = useQuery<Athlete[]>({
@@ -148,6 +171,26 @@ export default function CoachDashboard() {
               />
             </DialogContent>
           </Dialog>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Coach
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => window.location.href = '/admin/account'}>
+                <User className="h-4 w-4 mr-2" />
+                Account Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
