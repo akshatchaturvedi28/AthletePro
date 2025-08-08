@@ -106,6 +106,7 @@ export default function UserSignUp() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: formData.email,
+          password: formData.password,
           username: formData.username,
           firstName: formData.firstName || undefined,
           lastName: formData.lastName || undefined,
