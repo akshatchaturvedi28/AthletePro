@@ -36,6 +36,7 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   username: varchar("username").unique(),
   phoneNumber: varchar("phone_number"),
+  password: varchar("password"), // Added for password-based authentication
   occupation: varchar("occupation"),
   bodyWeight: decimal("body_weight", { precision: 5, scale: 2 }),
   bodyHeight: decimal("body_height", { precision: 5, scale: 2 }),

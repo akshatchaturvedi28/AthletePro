@@ -208,9 +208,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      // In a real app, you would verify the password hash here
-      // For now, we'll accept any password for existing users (demo purposes)
-      // TODO: Implement password hashing and verification
+      // Verify password - for demo purposes, check against stored password
+      // In production, you would use bcrypt to compare hashed passwords
+      if (!user.password) {
+        return res.status(401).json({ message: "Password not set for this account" });
+      }
+      
+      if (user.password !== password) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
       
       if (!user.isRegistered) {
         return res.status(401).json({ message: "Account not activated. Please complete registration." });
@@ -248,6 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { 
         email, 
+        password,
         username, 
         firstName, 
         lastName,
@@ -280,10 +287,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create unique user ID
       const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      if (!password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
       // Create new user
       const newUser = await storage.upsertUser({
         id: userId,
         email,
+        password, // Store password (in production, use bcrypt to hash)
         firstName,
         lastName,
         username,
