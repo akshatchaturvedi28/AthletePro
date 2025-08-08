@@ -53,12 +53,22 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
       return response.json();
     },
     onSuccess: (data) => {
-      setParsedWorkout(data);
-      setIsEditing(true);
-      toast({
-        title: "Workout Parsed Successfully",
-        description: "Review the parsed workout and make any necessary adjustments.",
-      });
+      // The API returns { workouts: [...], count: number }
+      // For now, use the first workout or combine them
+      if (data.workouts && data.workouts.length > 0) {
+        setParsedWorkout(data.workouts[0]);
+        setIsEditing(true);
+        toast({
+          title: "Workout Parsed Successfully",
+          description: `Found ${data.count} workout(s). Showing the first one for editing.`,
+        });
+      } else {
+        toast({
+          title: "No Workouts Found",
+          description: "No valid workouts were found in the provided text.",
+          variant: "destructive",
+        });
+      }
     },
     onError: (error) => {
       toast({
