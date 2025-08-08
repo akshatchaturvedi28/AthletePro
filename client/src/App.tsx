@@ -84,8 +84,8 @@ function Router() {
         </>
       ) : (
         <>
-          {/* Check user role and redirect accordingly */}
-          {(user as any)?.membership?.role === "manager" || (user as any)?.membership?.role === "coach" ? (
+          {/* Check user role and redirect accordingly - Admin users have admin_ ID prefix or Coach/Manager occupation */}
+          {(user as any)?.id?.startsWith('admin_') || (user as any)?.occupation === 'Coach' || (user as any)?.occupation === 'Community Manager' || (user as any)?.membership?.role === "manager" || (user as any)?.membership?.role === "coach" ? (
             <>
               <Route path="/" component={CoachDashboard} />
               <Route path="/dashboard" component={CoachDashboard} />
