@@ -325,6 +325,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin signup endpoint (creates admin user with community management role)
+  app.post('/api/auth/admin-signup', async (req, res) => {
+    try {
+      const { 
+        email, 
+        password,
+        phoneNumber,
+        name,
+        role,
+        gymName,
+        location,
+        bio,
+        socialHandles
+      } = req.body;
+      
+      if (!email || !password || !name || !role) {
+        return res.status(400).json({ message: "Email, password, name, and role are required" });
+      }
+      
+      // Check if user already exists with this email
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      
+      // Create unique user ID
+      const userId = `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const [firstName, ...lastNameParts] = name.split(' ');
+      const lastName = lastNameParts.join(' ');
+      
+      // Create new admin user
+      const newUser = await storage.upsertUser({
+        id: userId,
+        email,
+        password,
+        firstName: firstName || name,
+        lastName: lastName || '',
+        phoneNumber,
+        username: `${firstName.toLowerCase()}_${role}`,
+        occupation: role === 'manager' ? 'Community Manager' : 'Coach',
+        bio,
+        isRegistered: true,
+        registeredAt: new Date()
+      });
+      
+      // If creating a community manager and gym details provided, create community
+      if (role === 'manager' && gymName) {
+        try {
+          const community = await storage.createCommunity({
+            name: gymName,
+            location: location || '',
+            description: bio || '',
+            socialHandles: socialHandles || {},
+            managerId: userId
+          });
+          
+          // Add manager as community member
+          await storage.addCommunityMember({
+            communityId: community.id,
+            userId: userId,
+            role: 'manager'
+          });
+        } catch (error) {
+          console.warn('Failed to create community for manager:', error);
+        }
+      }
+      
+      res.json({ 
+        message: "Admin account created successfully", 
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          username: newUser.username,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          role: role
+        }
+      });
+    } catch (error) {
+      console.error("Error creating admin account:", error);
+      res.status(500).json({ message: "Failed to create admin account" });
+    }
+  });
+
+  // Admin signin endpoint
+  app.post('/api/auth/admin-signin', async (req: any, res) => {
+    try {
+      const { identifier, password, type } = req.body;
+      
+      if (!identifier || !password || !type) {
+        return res.status(400).json({ message: "Email/phone, password, and type are required" });
+      }
+      
+      // Find admin user by email or phone
+      let user;
+      if (type === 'email') {
+        user = await storage.getUserByEmail(identifier);
+      } else if (type === 'phone') {
+        user = await storage.getUserByEmail(identifier);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Verify this is an admin user (has admin ID prefix or admin role)
+      if (!user.id.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.occupation || '')) {
+        return res.status(401).json({ message: "Not authorized for admin access" });
+      }
+      
+      // Verify password
+      if (!user.password) {
+        return res.status(401).json({ message: "Password not set for this account" });
+      }
+      
+      if (user.password !== password) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      if (!user.isRegistered) {
+        return res.status(401).json({ message: "Account not activated. Please complete registration." });
+      }
+      
+      // Create admin session
+      if (req.session) {
+        req.session.user = {
+          claims: {
+            sub: user.id,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username,
+            email: user.email,
+            role: user.occupation
+          }
+        };
+      }
+      
+      res.json({ 
+        message: "Admin sign in successful", 
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.occupation
+        }
+      });
+    } catch (error) {
+      console.error("Error during admin signin:", error);
+      res.status(500).json({ message: "Failed to sign in" });
+    }
+  });
+
   // User registration endpoint (for authenticated users)
   app.post('/api/auth/register', authMiddleware, async (req: any, res) => {
     try {

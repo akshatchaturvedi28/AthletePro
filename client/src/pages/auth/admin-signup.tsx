@@ -47,14 +47,35 @@ export default function AdminSignUp() {
     setError('');
 
     try {
-      // Registration logic would go here
-      console.log('Admin registration:', formData);
-      
-      // For now, redirect to sign in
-      window.location.href = '/admin/signin';
+      // Create admin account
+      const response = await fetch('/api/auth/admin-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          phoneNumber: formData.phone,
+          name: formData.name,
+          role: formData.role,
+          gymName: formData.gymName,
+          location: formData.location,
+          bio: formData.bio,
+          socialHandles: formData.socialHandles
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log('Admin account created successfully:', result);
+        window.location.href = '/admin/signin?message=Account created successfully. Please sign in.';
+      } else {
+        throw new Error(result.message || 'Failed to create account');
+      }
       
     } catch (err) {
-      setError('Failed to create account. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
