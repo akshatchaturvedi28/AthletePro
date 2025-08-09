@@ -4,31 +4,15 @@ dotenv.config();
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { serveStatic, log } from "./vite";
 
 function validateEnvironmentVariables() {
-  const required = ["DATABASE_URL"];
+  const required = ["DATABASE_URL", "SESSION_SECRET"];
   const missing = required.filter(env => !process.env[env]);
   
   if (missing.length > 0) {
     console.error(`Missing required environment variables: ${missing.join(", ")}`);
     process.exit(1);
-  }
-  
-  // Validate authentication-related variables for production
-  if (process.env.NODE_ENV === "production") {
-    // SESSION_SECRET is always required
-    if (!process.env.SESSION_SECRET) {
-      console.error("Missing required SESSION_SECRET environment variable");
-      process.exit(1);
-    }
-    
-    // REPL_ID and REPLIT_DOMAINS are optional - if missing, authentication will be disabled
-    const replitAuthMissing = !process.env.REPL_ID || !process.env.REPLIT_DOMAINS;
-    if (replitAuthMissing) {
-      console.warn("Replit authentication variables (REPL_ID, REPLIT_DOMAINS) not provided");
-      console.warn("Authentication will be disabled - application will run in restricted mode");
-    }
   }
   
   log("Environment variables validated successfully");
@@ -83,17 +67,10 @@ app.use((req, res, next) => {
       throw err;
     });
 
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
-    }
+    // Serve static files in production
+    serveStatic(app);
 
-    // Use PORT environment variable for Cloud Run compatibility
-    // Fall back to 8080 for local development
+    // Use PORT environment variable for deployment compatibility
     const port = parseInt(process.env.PORT || "8080", 10);
     
     if (isNaN(port) || port < 1 || port > 65535) {
@@ -102,7 +79,7 @@ app.use((req, res, next) => {
     
     // Error handling for server startup
     const serverInstance = server.listen(port, "0.0.0.0", () => {
-      log(`serving on port ${port}`);
+      log(`AthletePro server running on port ${port}`);
     }).on('error', (err) => {
       console.error('Server startup error:', err);
       process.exit(1);

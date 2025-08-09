@@ -1,30 +1,8 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, isReplitAuthAvailable } from "./replitAuth";
-
-// Helper to get the right auth middleware based on environment
-const getAuthMiddleware = () => {
-  if (process.env.NODE_ENV === 'development') {
-    // For development, use a simple middleware that doesn't require real auth
-    return (req: any, res: any, next: any) => {
-      // Create a mock user if none exists
-      if (!req.user) {
-        req.user = {
-          claims: {
-            sub: 'local-dev-user',
-            name: 'Local Dev User',
-            email: 'dev@localhost.com'
-          }
-        };
-      }
-      next();
-    };
-  }
-  
-  // For production, use the isAuthenticated middleware which handles fallbacks internally
-  return isAuthenticated;
-};
+import { setupAuth, authMiddleware } from "./auth";
 import { WorkoutParser } from "./services/workoutParser";
 import { ProgressTracker } from "./services/progressTracker";
 import { BENCHMARK_WORKOUTS } from "./data/benchmarkWorkouts";
@@ -39,14 +17,11 @@ import {
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware - use local auth for development
-  if (process.env.NODE_ENV === 'development') {
-    const { setupLocalAuth } = await import("./localAuth.js");
-    setupLocalAuth(app);
-  } else {
-    // Setup auth will handle fallback if Replit auth is not available
-    await setupAuth(app);
-  }
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: false }));
+
+  // Setup unified authentication
+  setupAuth(app);
 
   // Seed benchmark workouts on startup
   (async () => {
@@ -63,18 +38,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   })();
 
-  // Get auth middleware
-  const authMiddleware = getAuthMiddleware();
-
   // Auth routes
   app.get('/api/logout', async (req: any, res) => {
     try {
-      // For development, just redirect to landing page
-      if (process.env.NODE_ENV === 'development') {
-        return res.redirect('/');
-      }
-      
-      // For production, handle session logout
       if (req.session) {
         req.session.destroy((err: any) => {
           if (err) {
@@ -95,54 +61,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/user', async (req: any, res) => {
     try {
-      // For development, always create a mock user
-      if (process.env.NODE_ENV === 'development') {
-        if (!req.user) {
-          req.user = {
-            claims: {
-              sub: 'local-dev-user',
-              name: 'Local Dev User',
-              email: 'dev@localhost.com'
-            }
-          };
-        }
-      }
-      
-      // Check if user is authenticated - allow guest users in production
-      if (!req.user?.claims?.sub) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-
       const userId = req.user.claims.sub;
-      const isGuestUser = userId === 'guest-user';
       let user = await storage.getUser(userId);
       
-      // For development mode or guest users, create user if doesn't exist
-      if (!user && (process.env.NODE_ENV === 'development' || isGuestUser)) {
-        const userData = isGuestUser ? {
+      // Create demo user if doesn't exist
+      if (!user) {
+        const userData = {
           id: userId,
-          username: 'GuestUser',
-          email: 'guest@app.com',
-          phoneNumber: '+0000000000',
-          occupation: 'Guest',
-          bodyWeight: '70',
-          bodyHeight: '175',
-          yearsOfExperience: 0,
-          bio: 'Guest user for demonstration',
-          isRegistered: true,
-          registeredAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date()
-        } : {
-          id: userId,
-          username: 'LocalDevUser',
-          email: 'dev@localhost.com',
+          username: 'Demo',
+          email: 'demo@athletepro.com',
+          firstName: 'Demo',
+          lastName: 'User',
           phoneNumber: '+1234567890',
-          occupation: 'Developer',
+          occupation: 'Athlete',
           bodyWeight: '70',
           bodyHeight: '175',
           yearsOfExperience: 2,
-          bio: 'Local development user for testing',
+          bio: 'Demo user for AthletePro',
           isRegistered: true,
           registeredAt: new Date(),
           createdAt: new Date(),
@@ -156,29 +91,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // For development or guest users, always consider user as registered
-      if ((process.env.NODE_ENV === 'development' || isGuestUser) && !user.isRegistered) {
-        const updatedUser = await storage.updateUser(userId, {
-          isRegistered: true,
-          registeredAt: new Date()
-        });
-        if (updatedUser) {
-          user = updatedUser;
-        }
-      }
-      
-      // Check if user is properly registered (skip for development and guest users)
-      if (process.env.NODE_ENV !== 'development' && !isGuestUser && !user.isRegistered) {
-        return res.status(403).json({ message: "User not registered", needsRegistration: true });
-      }
-      
       // Get user's community membership
       const membership = await storage.getUserMembership(userId);
       
       res.json({
         ...user,
-        membership: membership || null,
-        isGuest: isGuestUser
+        membership: membership || null
       });
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -200,7 +118,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (type === 'email') {
         user = await storage.getUserByEmail(identifier);
       } else if (type === 'phone') {
-        // Note: We would need a getUserByPhone method, for now using email lookup
         user = await storage.getUserByEmail(identifier);
       }
       
@@ -208,8 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
-      // Verify password - for demo purposes, check against stored password
-      // In production, you would use bcrypt to compare hashed passwords
+      // Verify password
       if (!user.password) {
         return res.status(401).json({ message: "Password not set for this account" });
       }
@@ -249,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User signup endpoint (creates new user)
+  // User signup endpoint
   app.post('/api/auth/signup', async (req, res) => {
     try {
       const { 
@@ -295,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newUser = await storage.upsertUser({
         id: userId,
         email,
-        password, // Store password (in production, use bcrypt to hash)
+        password,
         firstName,
         lastName,
         username,
@@ -527,7 +443,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User registration endpoint (for authenticated users)
+  // Admin signup endpoint (creates admin user with community management role)
+  app.post('/api/auth/admin-signup', async (req, res) => {
+    try {
+      const { 
+        email, 
+        password,
+        phoneNumber,
+        name,
+        role,
+        gymName,
+        location,
+        bio,
+        socialHandles
+      } = req.body;
+      
+      if (!email || !password || !name || !role) {
+        return res.status(400).json({ message: "Email, password, name, and role are required" });
+      }
+      
+      // Check if user already exists with this email
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      
+      // Create unique user ID
+      const userId = `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const [firstName, ...lastNameParts] = name.split(' ');
+      const lastName = lastNameParts.join(' ');
+      
+      // Create new admin user
+      const newUser = await storage.upsertUser({
+        id: userId,
+        email,
+        password,
+        firstName: firstName || name,
+        lastName: lastName || '',
+        phoneNumber,
+        username: `${firstName.toLowerCase()}_${role}`,
+        occupation: role === 'manager' ? 'Community Manager' : 'Coach',
+        bio,
+        isRegistered: true,
+        registeredAt: new Date()
+      });
+      
+      // If creating a community manager and gym details provided, create community
+      if (role === 'manager' && gymName) {
+        try {
+          const community = await storage.createCommunity({
+            name: gymName,
+            location: location || '',
+            description: bio || '',
+            socialHandles: socialHandles || {},
+            managerId: userId
+          });
+          
+          // Add manager as community member
+          await storage.addCommunityMember({
+            communityId: community.id,
+            userId: userId,
+            role: 'manager'
+          });
+        } catch (error) {
+          console.warn('Failed to create community for manager:', error);
+        }
+      }
+      
+      res.json({ 
+        message: "Admin account created successfully", 
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          username: newUser.username,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+          role: role
+        }
+      });
+    } catch (error) {
+      console.error("Error creating admin account:", error);
+      res.status(500).json({ message: "Failed to create admin account" });
+    }
+  });
+
+  // Admin signin endpoint
+  app.post('/api/auth/admin-signin', async (req: any, res) => {
+    try {
+      const { identifier, password, type } = req.body;
+      
+      if (!identifier || !password || !type) {
+        return res.status(400).json({ message: "Email/phone, password, and type are required" });
+      }
+      
+      // Find admin user by email or phone
+      let user;
+      if (type === 'email') {
+        user = await storage.getUserByEmail(identifier);
+      } else if (type === 'phone') {
+        user = await storage.getUserByEmail(identifier);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Verify this is an admin user (has admin ID prefix or admin role)
+      if (!user.id.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.occupation || '')) {
+        return res.status(401).json({ message: "Not authorized for admin access" });
+      }
+      
+      // Verify password
+      if (!user.password) {
+        return res.status(401).json({ message: "Password not set for this account" });
+      }
+      
+      if (user.password !== password) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      if (!user.isRegistered) {
+        return res.status(401).json({ message: "Account not activated. Please complete registration." });
+      }
+      
+      // Create admin session
+      if (req.session) {
+        req.session.user = {
+          claims: {
+            sub: user.id,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username,
+            email: user.email,
+            role: user.occupation
+          }
+        };
+      }
+      
+      res.json({ 
+        message: "Admin sign in successful", 
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.occupation
+        }
+      });
+    } catch (error) {
+      console.error("Error during admin signin:", error);
+      res.status(500).json({ message: "Failed to sign in" });
+    }
+  });
+
+  // Admin session check endpoint
+  app.get('/api/auth/admin-session', async (req: any, res) => {
+    try {
+      const user = req.session?.user;
+      
+      if (!user || !user.claims) {
+        return res.status(401).json({ message: "Not authenticated as admin" });
+      }
+      
+      // Verify this is an admin user
+      const userId = user.claims.sub;
+      if (!userId.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.claims.role || '')) {
+        return res.status(401).json({ message: "Not authorized for admin access" });
+      }
+      
+      res.json({ 
+        user: {
+          id: user.claims.sub,
+          email: user.claims.email,
+          name: user.claims.name,
+          role: user.claims.role || 'Coach'
+        }
+      });
+    } catch (error) {
+      console.error("Error checking admin session:", error);
+      res.status(500).json({ message: "Failed to check admin session" });
+    }
+  });
+
+  // Logout endpoint
+  app.post('/api/auth/logout', (req: any, res) => {
+    try {
+      if (req.session) {
+        req.session.destroy((err: any) => {
+          if (err) {
+            console.error('Session destruction error:', err);
+            return res.status(500).json({ message: 'Failed to logout' });
+          }
+          res.clearCookie('connect.sid');
+          res.json({ message: 'Successfully logged out' });
+        });
+      } else {
+        res.json({ message: 'No active session found' });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({ message: 'Failed to logout' });
+    }
+  });
+
+  // User registration endpoint
   app.post('/api/auth/register', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -765,11 +883,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CRITICAL: Community routes MUST come before generic /api/workouts/:id route
-  // Handle community workouts - when no community ID (user not in a community)
+  // Community workouts
   app.get('/api/workouts/community', authMiddleware, async (req, res) => {
     try {
-      console.log("Hit /api/workouts/community route");
       res.json([]);
     } catch (error) {
       console.error("Error fetching community workouts:", error);
@@ -777,32 +893,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workouts/community/', authMiddleware, async (req, res) => {
-    try {
-      console.log("Hit /api/workouts/community/ route");
-      res.json([]);
-    } catch (error) {
-      console.error("Error fetching community workouts:", error);
-      res.status(500).json({ message: "Failed to fetch workouts" });
-    }
-  });
-
-  // Handle undefined, null, or invalid community IDs
   app.get('/api/workouts/community/:id', authMiddleware, async (req, res) => {
     try {
       const idParam = req.params.id;
-      console.log(`Hit /api/workouts/community/:id route with id: ${idParam}`);
       
-      // Handle undefined, null, or empty string cases
       if (!idParam || idParam === 'undefined' || idParam === 'null' || idParam === '') {
         return res.json([]);
       }
       
       const communityId = parseInt(idParam);
       
-      // Add validation for NaN
       if (isNaN(communityId)) {
-        return res.json([]); // Return empty array instead of error for invalid IDs
+        return res.json([]);
       }
       
       const workouts = await storage.getCommunityWorkouts(communityId);
@@ -813,13 +915,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // CRITICAL: This generic route MUST come AFTER community routes
   app.get('/api/workouts/:id', authMiddleware, async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
-      console.log(`Hit /api/workouts/:id route with id: ${req.params.id}`);
       
-      // Add validation for NaN
       if (isNaN(workoutId)) {
         return res.status(400).json({ message: "Invalid workout ID" });
       }
@@ -1118,7 +1217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const emailContent = {
         to: 'akshatchaturvedi17@gmail.com',
-        from: 'noreply@acrossfit.com', // This should be a verified sender in SendGrid
+        from: 'noreply@acrossfit.com',
         subject: type === 'feedback' ? `Anonymous Feedback: ${subject || 'No Subject'}` : `Contact Form: ${subject || 'No Subject'}`,
         text: type === 'feedback' 
           ? `Anonymous Feedback:\n\n${message}`

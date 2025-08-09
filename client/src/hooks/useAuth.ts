@@ -1,4 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
 import { User } from "@shared/schema";
 
 interface UserWithMembership extends User {
@@ -15,38 +14,44 @@ interface UserWithMembership extends User {
   } | null;
 }
 
-export function useAuth() {
-  const { data: user, isLoading, error } = useQuery<UserWithMembership>({
-    queryKey: ["/api/auth/user"],
-    retry: false,
-    queryFn: async () => {
-      const res = await fetch("/api/auth/user", {
-        credentials: "include",
-      });
-      
-      if (res.status === 401) {
-        return null;
-      }
-      
-      if (res.status === 403) {
-        const errorData = await res.json();
-        if (errorData.needsRegistration) {
-          throw new Error("NEEDS_REGISTRATION");
-        }
-      }
-      
-      if (!res.ok) {
-        throw new Error(`${res.status}: ${res.statusText}`);
-      }
-      
-      return await res.json();
-    },
-  });
+// Mock user for frontend-only demo
+const mockUser: UserWithMembership = {
+  id: "demo-user-1",
+  username: "DemoUser",
+  email: "demo@athletepro.com",
+  firstName: "Demo",
+  lastName: "User",
+  phoneNumber: "+1234567890",
+  occupation: "Athlete",
+  bodyWeight: "70",
+  bodyHeight: "175",
+  yearsOfExperience: 2,
+  bio: "Demo user for AthletePro showcase",
+  profileImageUrl: null,
+  password: null,
+  socialHandles: null,
+  isRegistered: true,
+  registeredAt: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  membership: {
+    id: 1,
+    communityId: 1,
+    userId: "demo-user-1",
+    role: "athlete",
+    joinedAt: new Date(),
+    community: {
+      id: 1,
+      name: "Demo CrossFit Box"
+    }
+  }
+};
 
+export function useAuth() {
   return {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    needsRegistration: error?.message === "NEEDS_REGISTRATION",
+    user: mockUser,
+    isLoading: false,
+    isAuthenticated: true,
+    needsRegistration: false,
   };
 }
