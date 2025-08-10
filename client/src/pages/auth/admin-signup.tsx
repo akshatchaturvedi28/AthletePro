@@ -48,20 +48,20 @@ export default function AdminSignUp() {
 
     try {
       // Create admin account
-      const response = await fetch('/api/auth/admin-signup', {
+      const nameParts = formData.name.trim().split(' ');
+      const firstName = nameParts[0] || formData.name;
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const response = await fetch('/api/auth/admin/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          phoneNumber: formData.phone,
-          name: formData.name,
-          role: formData.role,
-          gymName: formData.gymName,
-          location: formData.location,
-          bio: formData.bio,
-          socialHandles: formData.socialHandles
+          firstName,
+          lastName,
+          role: formData.role === 'manager' ? 'community_manager' : 'coach'
         })
       });
 

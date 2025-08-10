@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -20,6 +21,7 @@ import UserSignUp from "@/pages/auth/user-signup";
 import AdminSignIn from "@/pages/auth/admin-signin";
 import AdminSignUp from "@/pages/auth/admin-signup";
 import ForgotPassword from "@/pages/auth/forgot-password";
+import OIDCLogin from "@/pages/auth/oidc-login";
 
 // Athlete Pages
 import AthleteDashboard from "@/pages/athlete/dashboard";
@@ -42,8 +44,21 @@ import CoachCommunity from "@/pages/coach/community";
 import CoachLeaderboard from "@/pages/coach/leaderboard";
 
 function Router() {
-  const { isAuthenticated, isLoading, user, needsRegistration } = useAuth();
+  const { isAuthenticated, isLoading, user, needsRegistration, refresh } = useAuth();
 
+  // Check if user just came back from OAuth
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('authenticated') === 'true') {
+      console.log('🔄 OAuth callback detected, refreshing auth...');
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Refresh auth state
+      refresh();
+    }
+  }, [refresh]);
+
+  // Always show loading state while checking authentication
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -56,6 +71,16 @@ function Router() {
   if (needsRegistration) {
     return <Registration />;
   }
+
+  console.log('🔍 Router state:', { 
+    isAuthenticated, 
+    user: user?.email, 
+    userId: (user as any)?.id,
+    isLoading, 
+    currentPath: window.location.pathname,
+    accountType: (user as any)?.accountType,
+    role: (user as any)?.role 
+  });
 
   return (
     <Switch>
@@ -71,30 +96,28 @@ function Router() {
           {/* Authentication Routes */}
           <Route path="/signin" component={UserSignIn} />
           <Route path="/signup" component={UserSignUp} />
+          <Route path="/login" component={OIDCLogin} />
           <Route path="/admin/signin" component={AdminSignIn} />
           <Route path="/admin/signup" component={AdminSignUp} />
           <Route path="/admin" component={AdminSignIn} />
-          <Route path="/admin/console" component={AdminConsole} />
-          <Route path="/admin/coach" component={CoachDashboard} />
-          <Route path="/admin/account" component={AdminAccount} />
-          <Route path="/admin/manage-community" component={ManageCommunity} />
           <Route path="/forgot-password" component={() => <ForgotPassword userType="user" />} />
           <Route path="/admin/forgot-password" component={() => <ForgotPassword userType="admin" />} />
-          <Route path="/admin/create-community" component={CreateCommunity} />
         </>
       ) : (
         <>
           {/* Check user role and redirect accordingly - Admin users have admin_ ID prefix or Coach/Manager occupation */}
-          {(user as any)?.id?.startsWith('admin_') || (user as any)?.occupation === 'Coach' || (user as any)?.occupation === 'Community Manager' || (user as any)?.membership?.role === "manager" || (user as any)?.membership?.role === "coach" ? (
+          {(user as any)?.id?.startsWith('admin_') || (user as any)?.occupation === 'Coach' || (user as any)?.occupation === 'Community Manager' || (user as any)?.membership?.role === "manager" || (user as any)?.membership?.role === "coach" || (user as any)?.accountType === 'admin' || (user as any)?.role === 'coach' || (user as any)?.role === 'community_manager' ? (
             <>
               <Route path="/" component={CoachDashboard} />
               <Route path="/dashboard" component={CoachDashboard} />
               <Route path="/community" component={CoachCommunity} />
               <Route path="/leaderboard" component={CoachLeaderboard} />
               <Route path="/admin" component={AdminConsole} />
+              <Route path="/admin/console" component={AdminConsole} />
               <Route path="/admin/manage-community" component={ManageCommunity} />
               <Route path="/admin/coach" component={CoachDashboard} />
               <Route path="/admin/account" component={AdminAccount} />
+              <Route path="/admin/create-community" component={CreateCommunity} />
               <Route path="/profile" component={AthleteProfile} />
               <Route path="/progress" component={AthleteProgress} />
               <Route path="/account" component={AthleteAccount} />
@@ -103,13 +126,14 @@ function Router() {
             <>
               <Route path="/" component={AthleteDashboard} />
               <Route path="/dashboard" component={AthleteDashboard} />
+              <Route path="/athlete/dashboard" component={AthleteDashboard} />
               <Route path="/calendar" component={AthleteCalendar} />
               <Route path="/profile" component={AthleteProfile} />
               <Route path="/progress" component={AthleteProgress} />
               <Route path="/account" component={AthleteAccount} />
               <Route path="/athlete/:id">
-            {(params) => <PublicProfile athleteId={params.id} />}
-          </Route>
+                {(params) => <PublicProfile athleteId={params.id} />}
+              </Route>
             </>
           )}
           <Route path="/about" component={About} />

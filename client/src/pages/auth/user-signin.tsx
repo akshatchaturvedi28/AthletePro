@@ -41,9 +41,8 @@ export default function UserSignIn() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          identifier,
-          password,
-          type: signInMethod
+          email: identifier,
+          password
         })
       });
 
@@ -170,7 +169,7 @@ export default function UserSignIn() {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => window.location.href = '/api/login'}
+                  onClick={() => window.location.href = '/auth/login'}
                 >
                   Continue with Google
                 </Button>

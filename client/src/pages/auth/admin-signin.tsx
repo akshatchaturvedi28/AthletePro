@@ -36,14 +36,13 @@ export default function AdminSignIn() {
       }
 
       // Call the admin authentication API
-      const response = await fetch('/api/auth/admin-signin', {
+      const response = await fetch('/api/auth/admin/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          identifier,
-          password,
-          type: signInMethod
+          email: identifier,
+          password
         })
       });
 

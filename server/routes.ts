@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth } from "./auth";
+import { setupOIDCAuth } from "./oidcAuth";
 import dualRoutes, { requireUserAuth, requireAdminAuth, requireCommunityManager, requireCoachOrManager } from "./dualRoutes.js";
 import { WorkoutParser } from "./services/workoutParser";
 import { ProgressTracker } from "./services/progressTracker";
@@ -21,8 +21,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
 
-  // Setup session management (from the old auth system)
-  setupAuth(app);
+  // Setup OIDC authentication
+  setupOIDCAuth(app);
 
   // Use the new dual authentication routes
   app.use('/api/auth', dualRoutes);

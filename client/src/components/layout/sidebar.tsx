@@ -21,11 +21,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className }: SidebarProps) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [location] = useLocation();
 
-  const isAthlete = !user?.membership || user?.membership?.role === "athlete";
-  const isCoach = user?.membership?.role === "coach" || user?.membership?.role === "manager";
+  const isAthlete = (user as any)?.accountType === 'user' || !(user as any)?.membership || (user as any)?.membership?.role === "athlete";
+  const isCoach = (user as any)?.accountType === 'admin' || (user as any)?.role === 'coach' || (user as any)?.role === 'community_manager' || (user as any)?.membership?.role === "coach" || (user as any)?.membership?.role === "manager";
 
   const athleteNavigation = [
     {
@@ -131,7 +131,7 @@ export function Sidebar({ className }: SidebarProps) {
               {user?.firstName} {user?.lastName}
             </p>
             <p className="text-xs text-gray-500 truncate">
-              {user?.membership?.role || "Athlete"}
+              {(user as any)?.role || (user as any)?.membership?.role || "Athlete"}
             </p>
           </div>
         </div>
@@ -140,7 +140,10 @@ export function Sidebar({ className }: SidebarProps) {
           variant="outline" 
           size="sm"
           className="w-full justify-start text-gray-700 hover:text-red-600 hover:border-red-200"
-          onClick={() => window.location.href = "/api/logout"}
+          onClick={async () => {
+            await logout();
+            window.location.href = "/";
+          }}
         >
           <LogOut className="mr-2 h-4 w-4" />
           Logout

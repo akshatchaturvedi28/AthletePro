@@ -10,8 +10,12 @@
   },
   "routes": [
     {
+      "src": "/auth/(.*)",
+      "dest": "/api/index.ts?path=/auth/$1"
+    },
+    {
       "src": "/api/(.*)",
-      "dest": "/api/index.ts"
+      "dest": "/api/index.ts?path=/api/$1"
     },
     {
       "src": "/assets/(.*)",

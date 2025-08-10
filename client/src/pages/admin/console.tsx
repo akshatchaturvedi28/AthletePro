@@ -9,54 +9,23 @@ import { Users, Dumbbell, BarChart, Settings, Activity, TrendingUp, LogOut, User
 import { Navbar } from "@/components/layout/navbar";
 
 export default function AdminConsole() {
+  const { user, isLoading, isAuthenticated, logout } = useAuth();
   const [selectedTab, setSelectedTab] = useState("overview");
-  const [adminUser, setAdminUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
 
-  // Check admin authentication on component mount
+  // Redirect if not authenticated
   useEffect(() => {
-    const checkAdminAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/admin-session', {
-          credentials: 'include'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setAdminUser(data.user);
-        } else {
-          // Not authenticated as admin, redirect to signin
-          window.location.href = '/admin/signin';
-          return;
-        }
-      } catch (error) {
-        console.error('Admin auth check failed:', error);
-        window.location.href = '/admin/signin';
-        return;
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkAdminAuth();
-  }, []);
+    if (!isLoading && !isAuthenticated) {
+      window.location.href = '/admin/signin';
+    }
+  }, [isLoading, isAuthenticated]);
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include'
-      });
-      
-      if (response.ok) {
-        window.location.href = '/admin/signin?message=Successfully logged out';
-      } else {
-        console.error('Logout failed');
-        window.location.href = '/admin/signin';
-      }
+      await logout();
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout error:', error);
-      window.location.href = '/admin/signin';
+      window.location.href = '/';
     }
   };
 
@@ -68,7 +37,7 @@ export default function AdminConsole() {
     );
   }
 
-  if (!adminUser) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-8">
@@ -94,10 +63,10 @@ export default function AdminConsole() {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Console</h1>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="capitalize">
-                  {adminUser?.role || 'Admin'}
+                  {(user as any)?.role || 'Admin'}
                 </Badge>
                 <span className="text-gray-600">
-                  {adminUser?.email}
+                  {user?.email}
                 </span>
               </div>
             </div>
@@ -106,7 +75,7 @@ export default function AdminConsole() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {adminUser?.name || 'Admin'}
+                  {user?.firstName || user?.email || 'Admin'}
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>

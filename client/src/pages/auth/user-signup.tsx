@@ -49,45 +49,7 @@ export default function UserSignUp() {
       }
       
       setError('');
-      // Send verification code automatically
-      try {
-        await sendVerificationCode();
-        setShowVerification(true);
-      } catch (error) {
-        setError('Failed to send verification code');
-      }
-      return;
-    }
-
-    if (showVerification) {
-      // Handle email/phone verification
-      setIsLoading(true);
-      try {
-        // Verify the code with the backend
-        const response = await fetch('/api/verification/verify-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            identifier: formData.email, // Use email as primary identifier
-            code: formData.verificationCode,
-            type: 'email'
-          })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-          setFormData(prev => ({ ...prev, emailVerified: true }));
-          setShowVerification(false);
-          setStep(2);
-        } else {
-          throw new Error(result.error || 'Verification failed');
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Invalid verification code');
-      } finally {
-        setIsLoading(false);
-      }
+      setStep(2); // Skip verification, go directly to step 2
       return;
     }
 
@@ -107,7 +69,6 @@ export default function UserSignUp() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          username: formData.username,
           firstName: formData.firstName || undefined,
           lastName: formData.lastName || undefined,
           phoneNumber: formData.phoneNumber || undefined,
