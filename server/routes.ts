@@ -2,7 +2,8 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, authMiddleware } from "./auth";
+import { setupAuth } from "./auth";
+import dualRoutes, { requireUserAuth, requireAdminAuth, requireCommunityManager, requireCoachOrManager } from "./dualRoutes.js";
 import { WorkoutParser } from "./services/workoutParser";
 import { ProgressTracker } from "./services/progressTracker";
 import { BENCHMARK_WORKOUTS } from "./data/benchmarkWorkouts";
@@ -20,8 +21,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
 
-  // Setup unified authentication
+  // Setup session management (from the old auth system)
   setupAuth(app);
+
+  // Use the new dual authentication routes
+  app.use('/api/auth', dualRoutes);
 
   // Seed benchmark workouts on startup
   (async () => {
@@ -38,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   })();
 
-  // Auth routes
+  // Legacy logout route for backward compatibility
   app.get('/api/logout', async (req: any, res) => {
     try {
       if (req.session) {
@@ -59,632 +63,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/auth/user', async (req: any, res) => {
+  // Get authenticated user info (unified endpoint for both user and admin)
+  app.get('/api/user', async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      let user = await storage.getUser(userId);
-      
-      // Create demo user if doesn't exist
-      if (!user) {
-        const userData = {
-          id: userId,
-          username: 'Demo',
-          email: 'demo@athletepro.com',
-          firstName: 'Demo',
-          lastName: 'User',
-          phoneNumber: '+1234567890',
-          occupation: 'Athlete',
-          bodyWeight: '70',
-          bodyHeight: '175',
-          yearsOfExperience: 2,
-          bio: 'Demo user for AthletePro',
-          isRegistered: true,
-          registeredAt: new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
+      if (!req.session.user) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+
+      const sessionUser = req.session.user;
+      const userId = sessionUser.id;
+
+      if (sessionUser.accountType === 'user') {
+        let user = await storage.getUser(userId);
         
-        user = await storage.upsertUser(userData);
+        // Create demo user if doesn't exist (for backward compatibility)
+        if (!user) {
+          const userData = {
+            id: userId,
+            username: 'Demo',
+            email: sessionUser.email || 'demo@athletepro.com',
+            firstName: 'Demo',
+            lastName: 'User',
+            phoneNumber: '+1234567890',
+            occupation: 'Athlete',
+            bodyWeight: '70',
+            bodyHeight: '175',
+            yearsOfExperience: 2,
+            bio: 'Demo user for AthletePro',
+            isRegistered: true,
+            registeredAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          user = await storage.upsertUser(userData);
+        }
+        
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        
+        // Get user's community membership
+        const membership = await storage.getUserMembership(userId);
+        
+        res.json({
+          ...user,
+          membership: membership || null
+        });
+      } else if (sessionUser.accountType === 'admin') {
+        // For admin users, return admin info in user format for compatibility
+        res.json({
+          id: userId,
+          email: sessionUser.email,
+          username: `admin_${sessionUser.role}`,
+          firstName: 'Admin',
+          lastName: 'User',
+          role: sessionUser.role,
+          isRegistered: true,
+          accountType: 'admin'
+        });
+      } else {
+        return res.status(401).json({ message: 'Invalid account type' });
       }
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Get user's community membership
-      const membership = await storage.getUserMembership(userId);
-      
-      res.json({
-        ...user,
-        membership: membership || null
-      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
 
-  // User signin endpoint
-  app.post('/api/auth/signin', async (req: any, res) => {
+  // User profile routes (User Console only)
+  app.patch('/api/user/profile', requireUserAuth, async (req: any, res) => {
     try {
-      const { identifier, password, type } = req.body;
-      
-      if (!identifier || !password || !type) {
-        return res.status(400).json({ message: "Email/phone, password, and type are required" });
-      }
-      
-      // Find user by email or phone based on type
-      let user;
-      if (type === 'email') {
-        user = await storage.getUserByEmail(identifier);
-      } else if (type === 'phone') {
-        user = await storage.getUserByEmail(identifier);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      // Verify password
-      if (!user.password) {
-        return res.status(401).json({ message: "Password not set for this account" });
-      }
-      
-      if (user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      if (!user.isRegistered) {
-        return res.status(401).json({ message: "Account not activated. Please complete registration." });
-      }
-      
-      // Create a session for the authenticated user
-      if (req.session) {
-        req.session.user = {
-          claims: {
-            sub: user.id,
-            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username,
-            email: user.email
-          }
-        };
-      }
-      
-      res.json({ 
-        message: "Sign in successful", 
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName
-        }
-      });
-    } catch (error) {
-      console.error("Error during signin:", error);
-      res.status(500).json({ message: "Failed to sign in" });
-    }
-  });
-
-  // User signup endpoint
-  app.post('/api/auth/signup', async (req, res) => {
-    try {
-      const { 
-        email, 
-        password,
-        username, 
-        firstName, 
-        lastName,
-        phoneNumber, 
-        occupation, 
-        bodyWeight, 
-        bodyHeight, 
-        yearsOfExperience, 
-        bio 
-      } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
-      }
-      
-      // Check if user already exists with this email
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User with this email already exists" });
-      }
-      
-      // Check if username is taken
-      if (username) {
-        const userWithUsername = await storage.getUserByUsername(username);
-        if (userWithUsername) {
-          return res.status(400).json({ message: "Username is already taken" });
-        }
-      }
-      
-      // Create unique user ID
-      const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      if (!password) {
-        return res.status(400).json({ message: "Password is required" });
-      }
-
-      // Create new user
-      const newUser = await storage.upsertUser({
-        id: userId,
-        email,
-        password,
-        firstName,
-        lastName,
-        username,
-        phoneNumber,
-        occupation,
-        bodyWeight: bodyWeight ? parseFloat(bodyWeight).toString() : undefined,
-        bodyHeight: bodyHeight ? parseFloat(bodyHeight).toString() : undefined,
-        yearsOfExperience: yearsOfExperience ? parseInt(yearsOfExperience) : undefined,
-        bio,
-        isRegistered: true,
-        registeredAt: new Date()
-      });
-      
-      res.json({ 
-        message: "Account created successfully", 
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          username: newUser.username,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName
-        }
-      });
-    } catch (error) {
-      console.error("Error creating user:", error);
-      res.status(500).json({ message: "Failed to create account" });
-    }
-  });
-
-  // Admin signup endpoint (creates admin user with community management role)
-  app.post('/api/auth/admin-signup', async (req, res) => {
-    try {
-      const { 
-        email, 
-        password,
-        phoneNumber,
-        name,
-        role,
-        gymName,
-        location,
-        bio,
-        socialHandles
-      } = req.body;
-      
-      if (!email || !password || !name || !role) {
-        return res.status(400).json({ message: "Email, password, name, and role are required" });
-      }
-      
-      // Check if user already exists with this email
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User with this email already exists" });
-      }
-      
-      // Create unique user ID
-      const userId = `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const [firstName, ...lastNameParts] = name.split(' ');
-      const lastName = lastNameParts.join(' ');
-      
-      // Create new admin user
-      const newUser = await storage.upsertUser({
-        id: userId,
-        email,
-        password,
-        firstName: firstName || name,
-        lastName: lastName || '',
-        phoneNumber,
-        username: `${firstName.toLowerCase()}_${role}`,
-        occupation: role === 'manager' ? 'Community Manager' : 'Coach',
-        bio,
-        isRegistered: true,
-        registeredAt: new Date()
-      });
-      
-      // If creating a community manager and gym details provided, create community
-      if (role === 'manager' && gymName) {
-        try {
-          const community = await storage.createCommunity({
-            name: gymName,
-            location: location || '',
-            description: bio || '',
-            socialHandles: socialHandles || {},
-            managerId: userId
-          });
-          
-          // Add manager as community member
-          await storage.addCommunityMember({
-            communityId: community.id,
-            userId: userId,
-            role: 'manager'
-          });
-        } catch (error) {
-          console.warn('Failed to create community for manager:', error);
-        }
-      }
-      
-      res.json({ 
-        message: "Admin account created successfully", 
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          username: newUser.username,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          role: role
-        }
-      });
-    } catch (error) {
-      console.error("Error creating admin account:", error);
-      res.status(500).json({ message: "Failed to create admin account" });
-    }
-  });
-
-  // Admin signin endpoint
-  app.post('/api/auth/admin-signin', async (req: any, res) => {
-    try {
-      const { identifier, password, type } = req.body;
-      
-      if (!identifier || !password || !type) {
-        return res.status(400).json({ message: "Email/phone, password, and type are required" });
-      }
-      
-      // Find admin user by email or phone
-      let user;
-      if (type === 'email') {
-        user = await storage.getUserByEmail(identifier);
-      } else if (type === 'phone') {
-        user = await storage.getUserByEmail(identifier);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      // Verify this is an admin user (has admin ID prefix or admin role)
-      if (!user.id.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.occupation || '')) {
-        return res.status(401).json({ message: "Not authorized for admin access" });
-      }
-      
-      // Verify password
-      if (!user.password) {
-        return res.status(401).json({ message: "Password not set for this account" });
-      }
-      
-      if (user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      if (!user.isRegistered) {
-        return res.status(401).json({ message: "Account not activated. Please complete registration." });
-      }
-      
-      // Create admin session
-      if (req.session) {
-        req.session.user = {
-          claims: {
-            sub: user.id,
-            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username,
-            email: user.email,
-            role: user.occupation
-          }
-        };
-      }
-      
-      res.json({ 
-        message: "Admin sign in successful", 
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.occupation
-        }
-      });
-    } catch (error) {
-      console.error("Error during admin signin:", error);
-      res.status(500).json({ message: "Failed to sign in" });
-    }
-  });
-
-  // Admin session check endpoint
-  app.get('/api/auth/admin-session', async (req: any, res) => {
-    try {
-      const user = req.session?.user;
-      
-      if (!user || !user.claims) {
-        return res.status(401).json({ message: "Not authenticated as admin" });
-      }
-      
-      // Verify this is an admin user
-      const userId = user.claims.sub;
-      if (!userId.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.claims.role || '')) {
-        return res.status(401).json({ message: "Not authorized for admin access" });
-      }
-      
-      res.json({ 
-        user: {
-          id: user.claims.sub,
-          email: user.claims.email,
-          name: user.claims.name,
-          role: user.claims.role || 'Coach'
-        }
-      });
-    } catch (error) {
-      console.error("Error checking admin session:", error);
-      res.status(500).json({ message: "Failed to check admin session" });
-    }
-  });
-
-  // Logout endpoint
-  app.post('/api/auth/logout', (req: any, res) => {
-    try {
-      if (req.session) {
-        req.session.destroy((err: any) => {
-          if (err) {
-            console.error('Session destruction error:', err);
-            return res.status(500).json({ message: 'Failed to logout' });
-          }
-          res.clearCookie('connect.sid');
-          res.json({ message: 'Successfully logged out' });
-        });
-      } else {
-        res.json({ message: 'No active session found' });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      res.status(500).json({ message: 'Failed to logout' });
-    }
-  });
-
-  // Admin signup endpoint (creates admin user with community management role)
-  app.post('/api/auth/admin-signup', async (req, res) => {
-    try {
-      const { 
-        email, 
-        password,
-        phoneNumber,
-        name,
-        role,
-        gymName,
-        location,
-        bio,
-        socialHandles
-      } = req.body;
-      
-      if (!email || !password || !name || !role) {
-        return res.status(400).json({ message: "Email, password, name, and role are required" });
-      }
-      
-      // Check if user already exists with this email
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({ message: "User with this email already exists" });
-      }
-      
-      // Create unique user ID
-      const userId = `admin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const [firstName, ...lastNameParts] = name.split(' ');
-      const lastName = lastNameParts.join(' ');
-      
-      // Create new admin user
-      const newUser = await storage.upsertUser({
-        id: userId,
-        email,
-        password,
-        firstName: firstName || name,
-        lastName: lastName || '',
-        phoneNumber,
-        username: `${firstName.toLowerCase()}_${role}`,
-        occupation: role === 'manager' ? 'Community Manager' : 'Coach',
-        bio,
-        isRegistered: true,
-        registeredAt: new Date()
-      });
-      
-      // If creating a community manager and gym details provided, create community
-      if (role === 'manager' && gymName) {
-        try {
-          const community = await storage.createCommunity({
-            name: gymName,
-            location: location || '',
-            description: bio || '',
-            socialHandles: socialHandles || {},
-            managerId: userId
-          });
-          
-          // Add manager as community member
-          await storage.addCommunityMember({
-            communityId: community.id,
-            userId: userId,
-            role: 'manager'
-          });
-        } catch (error) {
-          console.warn('Failed to create community for manager:', error);
-        }
-      }
-      
-      res.json({ 
-        message: "Admin account created successfully", 
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          username: newUser.username,
-          firstName: newUser.firstName,
-          lastName: newUser.lastName,
-          role: role
-        }
-      });
-    } catch (error) {
-      console.error("Error creating admin account:", error);
-      res.status(500).json({ message: "Failed to create admin account" });
-    }
-  });
-
-  // Admin signin endpoint
-  app.post('/api/auth/admin-signin', async (req: any, res) => {
-    try {
-      const { identifier, password, type } = req.body;
-      
-      if (!identifier || !password || !type) {
-        return res.status(400).json({ message: "Email/phone, password, and type are required" });
-      }
-      
-      // Find admin user by email or phone
-      let user;
-      if (type === 'email') {
-        user = await storage.getUserByEmail(identifier);
-      } else if (type === 'phone') {
-        user = await storage.getUserByEmail(identifier);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      // Verify this is an admin user (has admin ID prefix or admin role)
-      if (!user.id.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.occupation || '')) {
-        return res.status(401).json({ message: "Not authorized for admin access" });
-      }
-      
-      // Verify password
-      if (!user.password) {
-        return res.status(401).json({ message: "Password not set for this account" });
-      }
-      
-      if (user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
-      
-      if (!user.isRegistered) {
-        return res.status(401).json({ message: "Account not activated. Please complete registration." });
-      }
-      
-      // Create admin session
-      if (req.session) {
-        req.session.user = {
-          claims: {
-            sub: user.id,
-            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.username,
-            email: user.email,
-            role: user.occupation
-          }
-        };
-      }
-      
-      res.json({ 
-        message: "Admin sign in successful", 
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          role: user.occupation
-        }
-      });
-    } catch (error) {
-      console.error("Error during admin signin:", error);
-      res.status(500).json({ message: "Failed to sign in" });
-    }
-  });
-
-  // Admin session check endpoint
-  app.get('/api/auth/admin-session', async (req: any, res) => {
-    try {
-      const user = req.session?.user;
-      
-      if (!user || !user.claims) {
-        return res.status(401).json({ message: "Not authenticated as admin" });
-      }
-      
-      // Verify this is an admin user
-      const userId = user.claims.sub;
-      if (!userId.startsWith('admin_') && !['Community Manager', 'Coach'].includes(user.claims.role || '')) {
-        return res.status(401).json({ message: "Not authorized for admin access" });
-      }
-      
-      res.json({ 
-        user: {
-          id: user.claims.sub,
-          email: user.claims.email,
-          name: user.claims.name,
-          role: user.claims.role || 'Coach'
-        }
-      });
-    } catch (error) {
-      console.error("Error checking admin session:", error);
-      res.status(500).json({ message: "Failed to check admin session" });
-    }
-  });
-
-  // Logout endpoint
-  app.post('/api/auth/logout', (req: any, res) => {
-    try {
-      if (req.session) {
-        req.session.destroy((err: any) => {
-          if (err) {
-            console.error('Session destruction error:', err);
-            return res.status(500).json({ message: 'Failed to logout' });
-          }
-          res.clearCookie('connect.sid');
-          res.json({ message: 'Successfully logged out' });
-        });
-      } else {
-        res.json({ message: 'No active session found' });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-      res.status(500).json({ message: 'Failed to logout' });
-    }
-  });
-
-  // User registration endpoint
-  app.post('/api/auth/register', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { username, phoneNumber, occupation, bodyWeight, bodyHeight, yearsOfExperience, bio } = req.body;
-      
-      // Check if user already exists and is registered
-      const existingUser = await storage.getUser(userId);
-      if (existingUser?.isRegistered) {
-        return res.status(400).json({ message: "User already registered" });
-      }
-      
-      // Update user with registration information
-      const updatedUser = await storage.updateUser(userId, {
-        username,
-        phoneNumber,
-        occupation,
-        bodyWeight,
-        bodyHeight,
-        yearsOfExperience,
-        bio,
-        isRegistered: true,
-        registeredAt: new Date()
-      });
-      
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      res.json({ message: "Registration completed successfully", user: updatedUser });
-    } catch (error) {
-      console.error("Error registering user:", error);
-      res.status(500).json({ message: "Failed to register user" });
-    }
-  });
-
-  // User profile routes
-  app.patch('/api/user/profile', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const updates = req.body;
       
       const updatedUser = await storage.updateUser(userId, updates);
@@ -699,10 +149,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Community routes
-  app.post('/api/communities', authMiddleware, async (req: any, res) => {
+  // Community routes (Admin Console - Community Managers)
+  app.post('/api/communities', requireCommunityManager, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.admin.id;
       const communityData = insertCommunitySchema.parse({
         ...req.body,
         managerId: userId
@@ -727,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/my', authMiddleware, async (req: any, res) => {
+  app.get('/api/communities/my', requireCommunityManager, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.admin.id;
       const community = await storage.getCommunityByManager(userId);
       
       if (!community) {
@@ -743,7 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id', authMiddleware, async (req, res) => {
+  app.get('/api/communities/:id', requireUserAuth, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const community = await storage.getCommunity(communityId);
@@ -759,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/members', authMiddleware, async (req, res) => {
+  app.get('/api/communities/:id/members', requireUserAuth, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const members = await storage.getCommunityMembers(communityId);
@@ -770,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/communities/:id/members', authMiddleware, async (req, res) => {
+  app.post('/api/communities/:id/members', requireCoachOrManager, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const membershipData = insertCommunityMembershipSchema.parse({
@@ -789,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/communities/:id/members/:userId', authMiddleware, async (req, res) => {
+  app.delete('/api/communities/:id/members/:userId', requireCoachOrManager, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const userId = req.params.userId;
@@ -802,8 +252,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Workout routes
-  app.post('/api/workouts/parse', authMiddleware, async (req, res) => {
+  // Workout routes (Both User and Admin Console)
+  app.post('/api/workouts/parse', requireUserAuth, async (req, res) => {
     try {
       const { rawText } = req.body;
       if (!rawText) {
@@ -821,9 +271,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/workouts', authMiddleware, async (req: any, res) => {
+  app.post('/api/workouts', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const workoutData = insertWorkoutSchema.parse({
         ...req.body,
         createdBy: userId
@@ -841,9 +291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk workout creation from parsed data
-  app.post('/api/workouts/bulk', authMiddleware, async (req: any, res) => {
+  app.post('/api/workouts/bulk', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { parsedWorkouts, communityId } = req.body;
       
       if (!parsedWorkouts || !Array.isArray(parsedWorkouts)) {
@@ -872,9 +322,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workouts/my', authMiddleware, async (req: any, res) => {
+  app.get('/api/workouts/my', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const workouts = await storage.getUserWorkouts(userId);
       res.json(workouts);
     } catch (error) {
@@ -884,7 +334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Community workouts
-  app.get('/api/workouts/community', authMiddleware, async (req, res) => {
+  app.get('/api/workouts/community', requireUserAuth, async (req, res) => {
     try {
       res.json([]);
     } catch (error) {
@@ -893,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workouts/community/:id', authMiddleware, async (req, res) => {
+  app.get('/api/workouts/community/:id', requireUserAuth, async (req, res) => {
     try {
       const idParam = req.params.id;
       
@@ -915,7 +365,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workouts/:id', authMiddleware, async (req, res) => {
+  app.get('/api/workouts/:id', requireUserAuth, async (req, res) => {
     try {
       const workoutId = parseInt(req.params.id);
       
@@ -936,10 +386,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Workout log routes
-  app.post('/api/workout-logs', authMiddleware, async (req: any, res) => {
+  // Workout log routes (User Console)
+  app.post('/api/workout-logs', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const logData = insertWorkoutLogSchema.parse({
         ...req.body,
         userId
@@ -982,9 +432,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workout-logs/my', authMiddleware, async (req: any, res) => {
+  app.get('/api/workout-logs/my', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const logs = await storage.getUserWorkoutLogs(userId);
       res.json(logs);
     } catch (error) {
@@ -993,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/workout-logs/community/:id', authMiddleware, async (req, res) => {
+  app.get('/api/workout-logs/community/:id', requireUserAuth, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const date = req.query.date as string;
@@ -1006,10 +456,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Progress and leaderboard routes
-  app.get('/api/progress/insights', authMiddleware, async (req: any, res) => {
+  // Progress and leaderboard routes (User Console)
+  app.get('/api/progress/insights', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const insights = await ProgressTracker.generateProgressInsights(userId);
       res.json(insights);
     } catch (error) {
@@ -1018,7 +468,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/leaderboard/community/:id', authMiddleware, async (req, res) => {
+  app.get('/api/leaderboard/community/:id', requireUserAuth, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const workoutName = req.query.workout as string;
@@ -1037,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Benchmark workout routes
+  // Benchmark workout routes (Public)
   app.get('/api/benchmark-workouts', async (req, res) => {
     try {
       const category = req.query.category as string;
@@ -1051,10 +501,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Olympic lift routes
-  app.get('/api/olympic-lifts/my', authMiddleware, async (req: any, res) => {
+  // Olympic lift routes (User Console)
+  app.get('/api/olympic-lifts/my', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const lifts = await storage.getUserOlympicLifts(userId);
       res.json(lifts);
     } catch (error) {
@@ -1063,9 +513,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/olympic-lifts/progress/:liftName', authMiddleware, async (req: any, res) => {
+  app.get('/api/olympic-lifts/progress/:liftName', requireUserAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const liftName = req.params.liftName;
       const progress = await storage.getUserLiftProgress(userId, liftName);
       res.json(progress);
@@ -1075,11 +525,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Community announcement routes
-  app.post('/api/communities/:id/announcements', authMiddleware, async (req: any, res) => {
+  // Community announcement routes (Admin Console - Coaches & Community Managers)
+  app.post('/api/communities/:id/announcements', requireCoachOrManager, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const userId = req.admin.id;
       
       const announcementData = insertCommunityAnnouncementSchema.parse({
         ...req.body,
@@ -1098,7 +548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/announcements', authMiddleware, async (req, res) => {
+  app.get('/api/communities/:id/announcements', requireUserAuth, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const announcements = await storage.getCommunityAnnouncements(communityId);
@@ -1109,11 +559,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Community attendance routes
-  app.post('/api/communities/:id/attendance', authMiddleware, async (req: any, res) => {
+  // Community attendance routes (Admin Console - Coaches & Community Managers)
+  app.post('/api/communities/:id/attendance', requireCoachOrManager, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const userId = req.admin.id;
       const { date, attendanceRecords } = req.body;
       
       for (const record of attendanceRecords) {
@@ -1133,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/attendance', authMiddleware, async (req, res) => {
+  app.get('/api/communities/:id/attendance', requireUserAuth, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const date = req.query.date as string;
@@ -1153,11 +603,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verification routes
   app.use('/api/verification', verificationRouter);
 
-  // Community goals routes
-  app.post('/api/communities/:id/goals', authMiddleware, async (req: any, res) => {
+  // Community goals routes (Admin Console - Coaches & Community Managers)
+  app.post('/api/communities/:id/goals', requireCoachOrManager, async (req: any, res) => {
     try {
       const communityId = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const userId = req.admin.id;
       
       const goalData = {
         ...req.body,
@@ -1173,7 +623,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/communities/:id/goals', authMiddleware, async (req, res) => {
+  app.get('/api/communities/:id/goals', requireUserAuth, async (req, res) => {
     try {
       const communityId = parseInt(req.params.id);
       const goals = await storage.getCommunityGoals(communityId);
@@ -1184,7 +634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/goals/:id', authMiddleware, async (req, res) => {
+  app.patch('/api/goals/:id', requireCoachOrManager, async (req, res) => {
     try {
       const goalId = parseInt(req.params.id);
       const { achieved } = req.body;
@@ -1197,7 +647,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Email routes for contact form and feedback
+  // Email routes for contact form and feedback (Public)
   app.post('/api/send-email', async (req, res) => {
     try {
       const { name, email, subject, message, type } = req.body;

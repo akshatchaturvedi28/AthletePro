@@ -1,11 +1,32 @@
 {
-  "buildCommand": "npm run vercel-build",
+  "version": 2,
+  "buildCommand": "npx vite build",
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
+  "functions": {
+    "api/index.ts": {
+      "runtime": "@vercel/node@3.2.17"
     }
-  ]
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/favicon\\.(ico|svg)",
+      "dest": "/favicon.$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

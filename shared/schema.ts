@@ -27,7 +27,16 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table (mandatory for Replit Auth)
+// Account type enum for dual authentication system
+export const accountTypeEnum = pgEnum("account_type", ["user", "admin"]);
+
+// User role enum for user console
+export const userRoleEnum = pgEnum("user_role", ["athlete", "athlete_in_community"]);
+
+// Admin role enum for admin console  
+export const adminRoleEnum = pgEnum("admin_role", ["coach", "community_manager"]);
+
+// User accounts table (User Console - Athletes)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().notNull(),
   email: varchar("email").unique(),
@@ -36,13 +45,47 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   username: varchar("username").unique(),
   phoneNumber: varchar("phone_number"),
-  password: varchar("password"), // Added for password-based authentication
+  password: varchar("password"),
   occupation: varchar("occupation"),
   bodyWeight: decimal("body_weight", { precision: 5, scale: 2 }),
   bodyHeight: decimal("body_height", { precision: 5, scale: 2 }),
   yearsOfExperience: integer("years_of_experience"),
   bio: text("bio"),
   socialHandles: jsonb("social_handles"),
+  role: userRoleEnum("role").default("athlete"),
+  isEmailVerified: boolean("is_email_verified").default(false),
+  emailVerificationToken: varchar("email_verification_token"),
+  phoneVerificationToken: varchar("phone_verification_token"),
+  isPhoneVerified: boolean("is_phone_verified").default(false),
+  resetPasswordToken: varchar("reset_password_token"),
+  resetPasswordExpires: timestamp("reset_password_expires"),
+  isRegistered: boolean("is_registered").default(false),
+  registeredAt: timestamp("registered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Admin accounts table (Admin Console - Coaches & Community Managers)
+export const admins = pgTable("admins", {
+  id: varchar("id").primaryKey().notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  username: varchar("username").unique(),
+  phoneNumber: varchar("phone_number"),
+  password: varchar("password"),
+  bio: text("bio"),
+  certifications: jsonb("certifications"), // For coaches
+  yearsOfExperience: integer("years_of_experience"),
+  socialHandles: jsonb("social_handles"),
+  role: adminRoleEnum("role").notNull(),
+  isEmailVerified: boolean("is_email_verified").default(false),
+  emailVerificationToken: varchar("email_verification_token"),
+  phoneVerificationToken: varchar("phone_verification_token"),
+  isPhoneVerified: boolean("is_phone_verified").default(false),
+  resetPasswordToken: varchar("reset_password_token"),
+  resetPasswordExpires: timestamp("reset_password_expires"),
   isRegistered: boolean("is_registered").default(false),
   registeredAt: timestamp("registered_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -207,8 +250,20 @@ export const workoutLogsRelations = relations(workoutLogs, ({ one }) => ({
   workout: one(workouts, { fields: [workoutLogs.workoutId], references: [workouts.id] }),
 }));
 
+// Admin relations
+export const adminsRelations = relations(admins, ({ many }) => ({
+  managedCommunities: many(communities),
+  createdAnnouncements: many(communityAnnouncements),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAdminSchema = createInsertSchema(admins).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -253,6 +308,9 @@ export const insertCommunityMembershipSchema = createInsertSchema(communityMembe
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type UpsertAdmin = typeof admins.$inferInsert;
+export type Admin = typeof admins.$inferSelect;
+export type InsertAdmin = z.infer<typeof insertAdminSchema>;
 export type Community = typeof communities.$inferSelect;
 export type InsertCommunity = z.infer<typeof insertCommunitySchema>;
 export type Workout = typeof workouts.$inferSelect;
@@ -269,3 +327,14 @@ export type CommunityMembership = typeof communityMemberships.$inferSelect;
 export type InsertCommunityMembership = z.infer<typeof insertCommunityMembershipSchema>;
 export type CommunityAttendance = typeof communityAttendance.$inferSelect;
 export type CommunityGoal = typeof communityGoals.$inferSelect;
+
+// Extended types for authentication
+export type UserWithMembership = User & {
+  membership?: CommunityMembership & {
+    community: Community;
+  };
+};
+
+export type AdminWithCommunity = Admin & {
+  managedCommunity?: Community;
+};
