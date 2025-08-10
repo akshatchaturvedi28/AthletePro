@@ -732,9 +732,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Route: POST /api/workouts/parse
     if (method === 'POST' && pathname === '/api/workouts/parse') {
-      const { workoutText } = req.body;
+      const { rawText } = req.body;
       
-      if (!workoutText) {
+      if (!rawText) {
         return res.status(400).json({ 
           success: false,
           error: 'Workout text is required' 
@@ -743,7 +743,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         // Parse the workout using the WorkoutParser
-        const parsedWorkouts = parseWorkout(workoutText);
+        const parsedWorkouts = parseWorkout(rawText);
         
         return res.status(200).json({
           success: true,

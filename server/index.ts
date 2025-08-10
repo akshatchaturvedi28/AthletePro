@@ -67,8 +67,10 @@ app.use((req, res, next) => {
       throw err;
     });
 
-    // Serve static files in production
-    serveStatic(app);
+    // Only serve static files in production
+    if (process.env.NODE_ENV === 'production') {
+      serveStatic(app);
+    }
 
     // Use PORT environment variable for deployment compatibility
     const port = parseInt(process.env.PORT || "8080", 10);
