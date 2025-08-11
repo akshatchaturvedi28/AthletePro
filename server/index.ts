@@ -3,7 +3,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
 import { serveStatic, log } from "./vite";
 
 function validateEnvironmentVariables() {
@@ -57,7 +56,10 @@ app.use((req, res, next) => {
     // Validate environment variables before starting server
     validateEnvironmentVariables();
     
-    const server = await registerRoutes(app);
+    // Development server now only serves static files
+    // All API logic is consolidated in api/index.ts for production
+    log("Development server: API routes are handled by Vercel functions in production");
+    log("For local development, use the production API endpoints");
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
@@ -67,10 +69,8 @@ app.use((req, res, next) => {
       throw err;
     });
 
-    // Only serve static files in production
-    if (process.env.NODE_ENV === 'production') {
-      serveStatic(app);
-    }
+    // Serve static files for development
+    serveStatic(app);
 
     // Use PORT environment variable for deployment compatibility
     const port = parseInt(process.env.PORT || "8080", 10);
@@ -80,9 +80,10 @@ app.use((req, res, next) => {
     }
     
     // Error handling for server startup
-    const serverInstance = server.listen(port, "0.0.0.0", () => {
-      log(`AthletePro server running on port ${port}`);
-    }).on('error', (err) => {
+    const serverInstance = app.listen(port, "0.0.0.0", () => {
+      log(`AthletePro development server running on port ${port}`);
+      log("Note: This server only serves static files. API calls go to production.");
+    }).on('error', (err: any) => {
       console.error('Server startup error:', err);
       process.exit(1);
     });

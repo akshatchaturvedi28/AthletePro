@@ -15,12 +15,29 @@ interface ParsedWorkout {
   name: string;
   description: string;
   type: string;
+  scoring?: string;
   timeCap?: number;
   restBetweenIntervals?: number;
   totalEffort?: number;
   relatedBenchmark?: string;
   barbellLifts?: string[];
   date?: string;
+}
+
+interface PRDParseResult {
+  success: boolean;
+  data: {
+    workout?: ParsedWorkout;
+    analysis: {
+      confidence: number;
+      category: string;
+      categoryLabel: string;
+      sourceTable?: string;
+      databaseId?: number;
+      errors?: string[];
+    };
+    suggestions: string[];
+  };
 }
 
 interface WorkoutParserProps {
@@ -32,6 +49,7 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
   const [rawText, setRawText] = useState("");
   const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [parseResult, setParseResult] = useState<PRDParseResult | null>(null);
   const { toast } = useToast();
 
   const workoutTypes = [
@@ -52,27 +70,36 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
       const response = await apiRequest("POST", "/api/workouts/parse", { rawText: text });
       return response.json();
     },
-    onSuccess: (data) => {
-      // The API returns { workouts: [...], count: number }
-      // For now, use the first workout or combine them
-      if (data.workouts && data.workouts.length > 0) {
-        setParsedWorkout(data.workouts[0]);
+    onSuccess: (data: PRDParseResult) => {
+      setParseResult(data);
+
+      if (data.success && data.data.workout) {
+        setParsedWorkout(data.data.workout);
         setIsEditing(true);
+        
+        const confidence = data.data.analysis.confidence;
+        const categoryLabel = data.data.analysis.categoryLabel;
+        
         toast({
-          title: "Workout Parsed Successfully",
-          description: `Found ${data.count} workout(s). Showing the first one for editing.`,
+          title: `🎯 Workout Parsed! (${confidence}% confidence)`,
+          description: `Identified as: ${categoryLabel}`,
+        });
+      } else if (data.data.suggestions && data.data.suggestions.length > 0) {
+        toast({
+          title: "🔍 No exact match found",
+          description: `Did you mean: ${data.data.suggestions.join(', ')}?`,
+          variant: "default",
         });
       } else {
         toast({
-          title: "No Workouts Found",
-          description: "No valid workouts were found in the provided text.",
-          variant: "destructive",
+          title: "❓ Custom Workout Detected",
+          description: "Parsed as custom workout - ready to save!",
         });
       }
     },
     onError: (error) => {
       toast({
-        title: "Parsing Failed",
+        title: "💥 Parsing Failed",
         description: "Failed to parse workout. Please check the format and try again.",
         variant: "destructive",
       });
@@ -89,14 +116,15 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
       setRawText("");
       setParsedWorkout(null);
       setIsEditing(false);
+      setParseResult(null);
       toast({
-        title: "Workout Created",
+        title: "✅ Workout Created",
         description: "Your workout has been created successfully.",
       });
     },
     onError: (error) => {
       toast({
-        title: "Creation Failed",
+        title: "💥 Creation Failed",
         description: "Failed to create workout. Please try again.",
         variant: "destructive",
       });
@@ -106,8 +134,8 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
   const handleParse = () => {
     if (!rawText.trim()) {
       toast({
-        title: "No Content",
-        description: "Please enter a workout description to parse.",
+        title: "⚠️ Input Required",
+        description: "Please enter workout text to parse",
         variant: "destructive",
       });
       return;
@@ -135,6 +163,13 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
     });
   };
 
+  const clearAll = () => {
+    setRawText("");
+    setParsedWorkout(null);
+    setIsEditing(false);
+    setParseResult(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Input Section */}
@@ -142,7 +177,7 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
         <CardHeader>
           <CardTitle className="flex items-center">
             <Zap className="h-5 w-5 mr-2 text-primary" />
-            AI Workout Parser
+            🧠 PRD Phase 1 Workout Parser
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -154,17 +189,19 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
 
 27-June-2025 | Friday
 
-STRENGTH
-Build to 1 RM Clean and Jerk in 15 mins.
+Fran
+21-15-9 reps for time of:
+Thrusters (95/65 lb)
+Pull-ups
 
-Workout: Chicago Slice
-For Time:
-120 Double Unders
-30 Kettlebell Swings
-50 Back Squats (40/30)
-30 Kettlebell Swings
-120 Double Unders
-Cap: 13 mins"
+Time cap: 8 minutes
+
+-- or --
+
+AMRAP 20 minutes:
+10 Burpees
+15 Kettlebell Swings (53/35)
+20 Air Squats"
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
               className="min-h-[150px]"
@@ -179,7 +216,7 @@ Cap: 13 mins"
               {parseMutation.isPending ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Parsing...
+                  Analyzing...
                 </>
               ) : (
                 <>
@@ -191,17 +228,76 @@ Cap: 13 mins"
             
             <Button
               variant="outline"
-              onClick={() => {
-                setRawText("");
-                setParsedWorkout(null);
-                setIsEditing(false);
-              }}
+              onClick={clearAll}
             >
-              Clear
+              Clear All
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* PRD Analysis Results */}
+      {parseResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Target className="h-5 w-5 mr-2 text-accent" />
+              🧠 PRD Analysis Results
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <Badge variant={parseResult.data.analysis.confidence > 80 ? "default" : "secondary"}>
+                    {parseResult.data.analysis.confidence}% Confidence
+                  </Badge>
+                  
+                  <Badge variant="outline">
+                    {parseResult.data.analysis.categoryLabel}
+                  </Badge>
+
+                  {parseResult.data.analysis.sourceTable && (
+                    <Badge variant="secondary" className="text-xs">
+                      Source: {parseResult.data.analysis.sourceTable}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {parseResult.data.suggestions && parseResult.data.suggestions.length > 0 && (
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">Smart Suggestions</Label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {parseResult.data.suggestions.map((suggestion, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setRawText(suggestion)}
+                      >
+                        {suggestion}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {parseResult.data.analysis.errors && parseResult.data.analysis.errors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <Label className="text-sm font-medium text-red-800">Parsing Issues</Label>
+                  <ul className="mt-1 text-sm text-red-700 list-inside list-disc">
+                    {parseResult.data.analysis.errors.map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Parsed Workout Section */}
       {parsedWorkout && (
@@ -288,6 +384,9 @@ Cap: 13 mins"
                   <h3 className="text-lg font-semibold">{parsedWorkout.name}</h3>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline">{parsedWorkout.type.replace("_", " ").toUpperCase()}</Badge>
+                    {parsedWorkout.scoring && (
+                      <Badge variant="secondary">{parsedWorkout.scoring}</Badge>
+                    )}
                     {parsedWorkout.timeCap && (
                       <Badge variant="secondary">
                         <Clock className="h-3 w-3 mr-1" />

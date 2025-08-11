@@ -475,7 +475,7 @@ export default function UserSignUp() {
                   <Button 
                     variant="outline" 
                     className="w-full"
-                    onClick={() => window.location.href = '/api/login'}
+                    onClick={() => window.location.href = '/auth/login'}
                   >
                     Continue with Google
                   </Button>

@@ -126,52 +126,20 @@ function updateAuthState(updates: Partial<AuthState>) {
   notifyListeners();
 }
 
-// Initialize auth state by checking session
+// Initialize auth state by checking session - UNIFIED ENDPOINT
 async function initializeAuth() {
   console.log('🔍 Initializing auth...');
   try {
-    // Try OIDC auth endpoint first
-    let response = await fetch('/auth/me', {
+    // Use unified session endpoint to prevent race conditions
+    const response = await fetch('/api/auth/session', {
       credentials: 'include'
     });
     
-    console.log('📡 OIDC auth response:', response.status, response.ok);
+    console.log('📡 Auth session response:', response.status, response.ok);
     
     if (response.ok) {
       const data = await response.json();
-      console.log('📋 OIDC auth data:', data);
-      
-      if (data.authenticated && data.user) {
-        console.log('✅ User authenticated via OIDC:', data.user.email);
-        console.log('🔄 Setting auth state for user:', data.user);
-        updateAuthState({
-          user: { ...data.user, accountType: 'user' },
-          isAuthenticated: true,
-          isLoading: false,
-          needsRegistration: false,
-          hasLinkedAccount: false,
-          linkedAccountRole: null,
-          accountType: 'user'
-        });
-        return;
-      } else {
-        console.log('❌ OIDC auth failed - not authenticated or no user data');
-      }
-    } else {
-      console.log('❌ OIDC auth endpoint failed with status:', response.status);
-    }
-    
-    // Fallback to legacy auth endpoint
-    console.log('🔄 Trying legacy auth endpoint /api/auth/session');
-    response = await fetch('/api/auth/session', {
-      credentials: 'include'
-    });
-    
-    console.log('📡 Legacy auth response:', response.status, response.ok);
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('📋 Legacy auth data:', data);
+      console.log('📋 Auth session data:', data);
       
       if (data.authenticated) {
         const user = data.user || data.admin;
@@ -179,7 +147,7 @@ async function initializeAuth() {
         const hasLinkedAccount = data.hasLinkedAccount || false;
         const linkedAccountRole = data.linkedAccountRole || null;
         
-        console.log('✅ User authenticated via legacy endpoint:', user?.email || 'unknown');
+        console.log('✅ User authenticated:', user?.email || 'unknown');
         console.log('🔄 Setting auth state for user:', user, 'accountType:', accountType);
         
         updateAuthState({
@@ -192,7 +160,7 @@ async function initializeAuth() {
           accountType
         });
       } else {
-        console.log('❌ Legacy auth failed - not authenticated');
+        console.log('❌ User not authenticated');
         updateAuthState({
           user: null,
           isAuthenticated: false,
@@ -204,7 +172,7 @@ async function initializeAuth() {
         });
       }
     } else {
-      console.log('❌ Legacy auth endpoint failed with status:', response.status);
+      console.log('❌ Auth session endpoint failed with status:', response.status);
       updateAuthState({
         user: null,
         isAuthenticated: false,

@@ -113,18 +113,67 @@ export const communityMemberships = pgTable("community_memberships", {
   joinedAt: timestamp("joined_at").defaultNow(),
 });
 
-// Workout types enum
+// Workout types enum - Expanded based on CrossFit specifications
 export const workoutTypeEnum = pgEnum("workout_type", [
   "for_time",
   "amrap",
   "emom",
-  "tabata",
-  "strength",
-  "interval",
-  "endurance",
+  "rft", // Rounds for Time
   "chipper",
-  "ladder",
-  "unbroken"
+  "interval",
+  "strength",
+  "gymnastics_skill_work",
+  "endurance",
+  "tabata",
+  "unbroken",
+  "ladder"
+]);
+
+// Workout category enum
+export const workoutCategoryEnum = pgEnum("workout_category", [
+  "girls",
+  "heroes",
+  "notables",
+  "custom_community", 
+  "custom_user"
+]);
+
+// Lift category enum
+export const liftCategoryEnum = pgEnum("lift_category", [
+  "squat",
+  "clean", 
+  "press",
+  "jerk",
+  "snatch",
+  "deadlift",
+  "olympic_lift",
+  "other"
+]);
+
+// Lift type enum
+export const liftTypeEnum = pgEnum("lift_type", [
+  "strength",
+  "olympic_lift",
+  "olympic_variation",
+  "olympic_accessory", 
+  "technique_focused",
+  "strength_variant",
+  "shoulder_isolation",
+  "overhead",
+  "mobility",
+  "stability",
+  "technique",
+  "olympic_composite",
+  "unilateral_strength",
+  "pull",
+  "assistance",
+  "posterior_chain",
+  "hamstring",
+  "strength_pull",
+  "advanced_olympic",
+  "legs",
+  "balance",
+  "core"
 ]);
 
 // Workouts table
@@ -161,7 +210,98 @@ export const workoutLogs = pgTable("workout_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Benchmark workouts (Girls, Heroes, etc.)
+// CrossFit Workout Types - Global Reference Table
+export const crossfitWorkoutTypes = pgTable("crossfit_workout_types", {
+  id: serial("id").primaryKey(),
+  workoutType: varchar("workout_type", { length: 50 }).notNull().unique(),
+  description: text("description").notNull(),
+  commonScoringPatterns: text("common_scoring_patterns").notNull(),
+  scoreFormat: varchar("score_format", { length: 100 }).notNull(),
+  examples: text("examples").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Girl WODs - Classic CrossFit Benchmark Workouts
+export const girlWods = pgTable("girl_wods", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  category: workoutCategoryEnum("category").notNull().default("girls"),
+  workoutType: workoutTypeEnum("workout_type").notNull(),
+  scoring: varchar("scoring", { length: 100 }).notNull(),
+  timeCap: integer("time_cap"), // in seconds
+  workoutDescription: text("workout_description").notNull(),
+  totalEffort: integer("total_effort").notNull(),
+  barbellLifts: jsonb("barbell_lifts"), // array of lift names
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Hero WODs - Memorial CrossFit Workouts
+export const heroWods = pgTable("hero_wods", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  category: workoutCategoryEnum("category").notNull().default("heroes"),
+  workoutType: workoutTypeEnum("workout_type").notNull(),
+  scoring: varchar("scoring", { length: 100 }).notNull(),
+  timeCap: integer("time_cap"), // in seconds
+  workoutDescription: text("workout_description").notNull(),
+  totalEffort: integer("total_effort").notNull(),
+  barbellLifts: jsonb("barbell_lifts"), // array of lift names
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Notables / Skills / Tests - CrossFit Skills & Tests
+export const notables = pgTable("notables", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  category: workoutCategoryEnum("category").notNull().default("notables"),
+  workoutType: workoutTypeEnum("workout_type").notNull(),
+  scoring: varchar("scoring", { length: 100 }).notNull(),
+  timeCap: integer("time_cap"), // in seconds
+  workoutDescription: text("workout_description").notNull(),
+  totalEffort: integer("total_effort"),
+  barbellLifts: jsonb("barbell_lifts"), // array of lift names
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Barbell Lifts - CrossFit Movement Database
+export const barbellLifts = pgTable("barbell_lifts", {
+  id: serial("id").primaryKey(),
+  liftName: varchar("lift_name", { length: 255 }).notNull().unique(),
+  category: liftCategoryEnum("category").notNull(),
+  liftType: liftTypeEnum("lift_type").notNull(), 
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Custom Community Workouts - Community-Level Custom Workouts
+export const customCommunityWorkouts = pgTable("custom_community_workouts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: workoutCategoryEnum("category").notNull().default("custom_community"),
+  workoutType: workoutTypeEnum("workout_type").notNull(),
+  scoring: varchar("scoring", { length: 100 }).notNull(),
+  timeCap: integer("time_cap"), // in seconds
+  workoutDescription: text("workout_description").notNull(),
+  relatedBenchmark: varchar("related_benchmark", { length: 255 }),
+  communityId: integer("community_id").notNull().references(() => communities.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Custom User Workouts - User-Level Custom Workouts
+export const customUserWorkouts = pgTable("custom_user_workouts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: workoutCategoryEnum("category").notNull().default("custom_user"),
+  workoutType: workoutTypeEnum("workout_type").notNull(),
+  scoring: varchar("scoring", { length: 100 }).notNull(),
+  timeCap: integer("time_cap"), // in seconds
+  workoutDescription: text("workout_description").notNull(),
+  relatedBenchmark: varchar("related_benchmark", { length: 255 }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Legacy Benchmark workouts (keeping for backward compatibility during transition)
 export const benchmarkWorkouts = pgTable("benchmark_workouts", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull().unique(),
@@ -305,6 +445,42 @@ export const insertCommunityMembershipSchema = createInsertSchema(communityMembe
   joinedAt: true,
 });
 
+// New insert schemas for workout tables
+export const insertCrossfitWorkoutTypeSchema = createInsertSchema(crossfitWorkoutTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertGirlWodSchema = createInsertSchema(girlWods).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertHeroWodSchema = createInsertSchema(heroWods).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertNotableSchema = createInsertSchema(notables).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertBarbellLiftSchema = createInsertSchema(barbellLifts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCustomCommunityWorkoutSchema = createInsertSchema(customCommunityWorkouts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCustomUserWorkoutSchema = createInsertSchema(customUserWorkouts).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -325,8 +501,24 @@ export type CommunityAnnouncement = typeof communityAnnouncements.$inferSelect;
 export type InsertCommunityAnnouncement = z.infer<typeof insertCommunityAnnouncementSchema>;
 export type CommunityMembership = typeof communityMemberships.$inferSelect;
 export type InsertCommunityMembership = z.infer<typeof insertCommunityMembershipSchema>;
-export type CommunityAttendance = typeof communityAttendance.$inferSelect;
+export type CommunityAttendance = typeof communityAttendance.$inferSelect;  
 export type CommunityGoal = typeof communityGoals.$inferSelect;
+
+// New types for workout tables
+export type CrossfitWorkoutType = typeof crossfitWorkoutTypes.$inferSelect;
+export type InsertCrossfitWorkoutType = z.infer<typeof insertCrossfitWorkoutTypeSchema>;
+export type GirlWod = typeof girlWods.$inferSelect;
+export type InsertGirlWod = z.infer<typeof insertGirlWodSchema>;
+export type HeroWod = typeof heroWods.$inferSelect;
+export type InsertHeroWod = z.infer<typeof insertHeroWodSchema>;
+export type Notable = typeof notables.$inferSelect;
+export type InsertNotable = z.infer<typeof insertNotableSchema>;
+export type BarbellLift = typeof barbellLifts.$inferSelect;
+export type InsertBarbellLift = z.infer<typeof insertBarbellLiftSchema>;
+export type CustomCommunityWorkout = typeof customCommunityWorkouts.$inferSelect;
+export type InsertCustomCommunityWorkout = z.infer<typeof insertCustomCommunityWorkoutSchema>;
+export type CustomUserWorkout = typeof customUserWorkouts.$inferSelect;
+export type InsertCustomUserWorkout = z.infer<typeof insertCustomUserWorkoutSchema>;
 
 // Extended types for authentication
 export type UserWithMembership = User & {

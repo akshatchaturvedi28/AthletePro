@@ -122,18 +122,18 @@ export function ProgressCharts() {
     );
   }
 
-  // Prepare data for charts
-  const recentProgressData = insights.recentProgress.map((item, index) => ({
-    name: item.workout.name,
-    score: item.finalScore,
+  // Prepare data for charts with safety checks
+  const recentProgressData = (insights.recentProgress || []).map((item, index) => ({
+    name: item.workout?.name || 'Unknown Workout',
+    score: item.finalScore || 0,
     date: format(new Date(item.date), "MM/dd"),
-    type: item.workout.type,
-    humanScore: item.humanReadableScore,
-    index: insights.recentProgress.length - index
+    type: item.workout?.type || 'for_time',
+    humanScore: item.humanReadableScore || 'N/A',
+    index: (insights.recentProgress || []).length - index
   }));
 
-  const workoutTypeData = insights.recentProgress.reduce((acc, item) => {
-    const type = item.workout.type.replace("_", " ");
+  const workoutTypeData = (insights.recentProgress || []).reduce((acc, item) => {
+    const type = (item.workout?.type || 'for_time').replace("_", " ");
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
