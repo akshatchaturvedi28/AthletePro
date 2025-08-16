@@ -115,7 +115,6 @@ const girlWods = pgTable("girl_wods", {
   timeCap: integer("time_cap"),
   totalEffort: integer("total_effort"),
   barbellLifts: jsonb("barbell_lifts"),
-  relatedBenchmark: varchar("related_benchmark", { length: 100 }),
 });
 
 const heroWods = pgTable("hero_wods", {
@@ -127,7 +126,6 @@ const heroWods = pgTable("hero_wods", {
   timeCap: integer("time_cap"),
   totalEffort: integer("total_effort"),
   barbellLifts: jsonb("barbell_lifts"),
-  relatedBenchmark: varchar("related_benchmark", { length: 100 }),
 });
 
 const notables = pgTable("notables", {
@@ -139,14 +137,70 @@ const notables = pgTable("notables", {
   timeCap: integer("time_cap"),
   totalEffort: integer("total_effort"),
   barbellLifts: jsonb("barbell_lifts"),
-  relatedBenchmark: varchar("related_benchmark", { length: 100 }),
 });
 
 const barbellLifts = pgTable("barbell_lifts", {
   id: serial("id").primaryKey(),
   liftName: varchar("lift_name", { length: 100 }).notNull().unique(),
   category: varchar("category", { length: 50 }).notNull(),
-  description: text("description"),
+  liftType: varchar("lift_type", { length: 50 }).notNull(),
+});
+
+// Workout source enum for assignments
+const workoutSourceEnum = pgEnum("workout_source", [
+  "custom_user",
+  "custom_community", 
+  "girl_wod",
+  "hero_wod",
+  "notable"
+]);
+
+// Custom User Workouts - User-Level Custom Workouts
+const customUserWorkouts = pgTable("custom_user_workouts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  workoutType: workoutTypeEnum("workout_type").notNull(),
+  scoring: varchar("scoring", { length: 100 }).notNull(),
+  timeCap: integer("time_cap"), // in seconds
+  workoutDescription: text("workout_description").notNull(),
+  relatedBenchmark: varchar("related_benchmark", { length: 255 }),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Custom Community Workouts - Community-Level Custom Workouts
+const customCommunityWorkouts = pgTable("custom_community_workouts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  workoutType: workoutTypeEnum("workout_type").notNull(),
+  scoring: varchar("scoring", { length: 100 }).notNull(),
+  timeCap: integer("time_cap"), // in seconds
+  workoutDescription: text("workout_description").notNull(),
+  relatedBenchmark: varchar("related_benchmark", { length: 255 }),
+  communityId: integer("community_id").notNull(),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User workout assignments - Maps workouts to dates for individual users
+const userWorkoutAssignments = pgTable("user_workout_assignments", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  assignedDate: varchar("assigned_date").notNull(),
+  workoutId: integer("workout_id").notNull(),
+  workoutSource: workoutSourceEnum("workout_source").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Community workout assignments - Maps workouts to dates for communities
+const communityWorkoutAssignments = pgTable("community_workout_assignments", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull(),
+  assignedDate: varchar("assigned_date").notNull(),
+  workoutId: integer("workout_id").notNull(),
+  workoutSource: workoutSourceEnum("workout_source").notNull(),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Validation schemas (inline for production)
@@ -297,7 +351,6 @@ async function parseWorkout(rawText: string, userId: string) {
             timeCap: workout.timeCap,
             totalEffort: workout.totalEffort,
             barbellLifts: workout.barbellLifts as string[] || [],
-            relatedBenchmark: workout.relatedBenchmark,
             sourceTable: 'girl_wods',
             databaseId: workout.id
           },
@@ -324,7 +377,6 @@ async function parseWorkout(rawText: string, userId: string) {
             timeCap: workout.timeCap,
             totalEffort: workout.totalEffort,
             barbellLifts: workout.barbellLifts as string[] || [],
-            relatedBenchmark: workout.relatedBenchmark,
             sourceTable: 'hero_wods',
             databaseId: workout.id
           },
@@ -351,7 +403,6 @@ async function parseWorkout(rawText: string, userId: string) {
             timeCap: workout.timeCap,
             totalEffort: workout.totalEffort,
             barbellLifts: workout.barbellLifts as string[] || [],
-            relatedBenchmark: workout.relatedBenchmark,
             sourceTable: 'notables',
             databaseId: workout.id
           },
@@ -378,7 +429,6 @@ async function parseWorkout(rawText: string, userId: string) {
         timeCap: timeCap,
         totalEffort: calculateTotalEffort(rawText),
         barbellLifts: barbellLiftsFound,
-        relatedBenchmark: null,
         sourceTable: 'custom',
         databaseId: null
       },
@@ -930,13 +980,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (result.workoutFound && result.workoutData) {
           const workoutData = {
             name: result.workoutData.name,
-            description: result.workoutData.workoutDescription,
+            workoutDescription: result.workoutData.workoutDescription,
             type: result.workoutData.workoutType,
             scoring: result.workoutData.scoring,
             timeCap: result.workoutData.timeCap,
             totalEffort: result.workoutData.totalEffort,
             barbellLifts: result.workoutData.barbellLifts,
-            relatedBenchmark: result.workoutData.relatedBenchmark
           };
           
           return res.status(200).json({
@@ -1573,6 +1622,704 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (error) {
         console.error('SendGrid email error:', error);
         return res.status(500).json({ error: 'Failed to send email' });
+      }
+    }
+
+    // ==================== WORKOUT ASSIGNMENT ROUTES ====================
+
+    // Assign Existing Workout to Date
+    if (method === 'POST' && pathname === '/api/workouts/assign-existing') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const { workoutId, workoutSource, assignedDate } = req.body;
+        
+        if (!workoutId || !workoutSource || !assignedDate) {
+          return res.status(400).json({ error: 'workoutId, workoutSource, and assignedDate are required' });
+        }
+
+        const assignment = await db.insert(userWorkoutAssignments).values({
+          userId: userData.id,
+          workoutId: parseInt(workoutId),
+          workoutSource: workoutSource as 'custom_user' | 'custom_community' | 'girl_wod' | 'hero_wod' | 'notable',
+          assignedDate: assignedDate
+        }).returning();
+
+        return res.json({
+          success: true,
+          assignment: assignment[0],
+          message: 'Workout assigned successfully'
+        });
+      } catch (error) {
+        console.error('Error assigning workout:', error);
+        return res.status(500).json({ error: 'Failed to assign workout' });
+      }
+    }
+
+    // Parse New Workout and Assign to Date
+    if (method === 'POST' && pathname === '/api/workouts/parse-and-assign') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const { rawText, assignedDate } = req.body;
+        
+        if (!rawText || !assignedDate) {
+          return res.status(400).json({ error: 'rawText and assignedDate are required' });
+        }
+
+        let workoutData;
+        
+        // Check if rawText is JSON (edited workout) or plain text
+        try {
+          const parsedJson = JSON.parse(rawText);
+          if (parsedJson.name && parsedJson.workoutDescription) {
+            workoutData = parsedJson;
+          } else {
+            throw new Error('Invalid JSON format');
+          }
+        } catch {
+          // Parse the workout first if it's plain text
+          const parseResult = await parseWorkout(rawText, userData.id);
+          
+          if (!parseResult.workoutFound || !parseResult.workoutData) {
+            return res.status(400).json({ error: 'Failed to parse workout' });
+          }
+          workoutData = parseResult.workoutData;
+        }
+
+        // Create custom user workout
+        const customWorkout = await db.insert(customUserWorkouts).values({
+          name: workoutData.name,
+          workoutType: workoutData.workoutType as any,
+          scoring: workoutData.scoring,
+          timeCap: workoutData.timeCap,
+          workoutDescription: workoutData.workoutDescription,
+          relatedBenchmark: workoutData.sourceTable !== 'custom' ? workoutData.name : null,
+          userId: userData.id
+        }).returning();
+
+        // Assign the created workout
+        const assignment = await db.insert(userWorkoutAssignments).values({
+          userId: userData.id,
+          workoutId: customWorkout[0].id,
+          workoutSource: 'custom_user',
+          assignedDate: assignedDate
+        }).returning();
+
+        return res.json({
+          success: true,
+          workout: customWorkout[0],
+          assignment: assignment[0],
+          message: 'Workout parsed, created, and assigned successfully'
+        });
+      } catch (error) {
+        console.error('Error parsing and assigning workout:', error);
+        return res.status(500).json({ 
+          error: 'Failed to parse and assign workout',
+          details: (error as Error).message 
+        });
+      }
+    }
+
+    // Clone Benchmark, Edit, and Assign to Date
+    if (method === 'POST' && pathname === '/api/workouts/clone-and-assign') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const { benchmarkId, sourceTable, assignedDate, modifications } = req.body;
+        
+        if (!benchmarkId || !sourceTable || !assignedDate) {
+          return res.status(400).json({ error: 'benchmarkId, sourceTable, and assignedDate are required' });
+        }
+
+        // Get the benchmark workout
+        let benchmarkWorkout;
+        switch (sourceTable) {
+          case 'girl_wods':
+            benchmarkWorkout = await db.select().from(girlWods).where(eq(girlWods.id, benchmarkId)).limit(1);
+            break;
+          case 'hero_wods':
+            benchmarkWorkout = await db.select().from(heroWods).where(eq(heroWods.id, benchmarkId)).limit(1);
+            break;
+          case 'notables':
+            benchmarkWorkout = await db.select().from(notables).where(eq(notables.id, benchmarkId)).limit(1);
+            break;
+          default:
+            return res.status(400).json({ error: 'Invalid source table' });
+        }
+
+        if (!benchmarkWorkout || benchmarkWorkout.length === 0) {
+          return res.status(404).json({ error: 'Benchmark workout not found' });
+        }
+
+        const original = benchmarkWorkout[0];
+
+        // Create custom workout with modifications
+        const customWorkout = await db.insert(customUserWorkouts).values({
+          name: modifications?.name || `${original.name} (Modified)`,
+          workoutType: modifications?.workoutType || original.workoutType as any,
+          scoring: modifications?.scoring || original.scoring,
+          timeCap: modifications?.timeCap !== undefined ? modifications.timeCap : original.timeCap,
+          workoutDescription: modifications?.workoutDescription || original.workoutDescription,
+          relatedBenchmark: original.name,
+          userId: userData.id
+        }).returning();
+
+        // Assign the created workout
+        const assignment = await db.insert(userWorkoutAssignments).values({
+          userId: userData.id,
+          workoutId: customWorkout[0].id,
+          workoutSource: 'custom_user',
+          assignedDate: assignedDate
+        }).returning();
+
+        return res.json({
+          success: true,
+          workout: customWorkout[0],
+          assignment: assignment[0],
+          message: 'Benchmark cloned, modified, and assigned successfully'
+        });
+      } catch (error) {
+        console.error('Error cloning and assigning workout:', error);
+        return res.status(500).json({ error: 'Failed to clone and assign workout' });
+      }
+    }
+
+    // Parse New Workout Only (No Date Assignment)
+    if (method === 'POST' && pathname === '/api/workouts/parse-only') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const { rawText } = req.body;
+        
+        if (!rawText) {
+          return res.status(400).json({ error: 'rawText is required' });
+        }
+
+        // Parse the workout first
+        const parseResult = await parseWorkout(rawText, userData.id);
+        
+        if (!parseResult.workoutFound || !parseResult.workoutData) {
+          return res.status(400).json({ error: 'Failed to parse workout' });
+        }
+
+        // Create custom user workout
+        const customWorkout = await db.insert(customUserWorkouts).values({
+          name: parseResult.workoutData.name,
+          workoutType: parseResult.workoutData.workoutType as any,
+          scoring: parseResult.workoutData.scoring,
+          timeCap: parseResult.workoutData.timeCap,
+          workoutDescription: parseResult.workoutData.workoutDescription,
+          relatedBenchmark: parseResult.workoutData.sourceTable !== 'custom' ? parseResult.workoutData.name : null,
+          userId: userData.id
+        }).returning();
+
+        return res.json({
+          success: true,
+          workout: customWorkout[0],
+          message: 'Workout parsed and created successfully'
+        });
+      } catch (error) {
+        console.error('Error parsing workout:', error);
+        return res.status(500).json({ error: 'Failed to parse workout' });
+      }
+    }
+
+    // Clone Benchmark and Edit Only (No Date Assignment)
+    if (method === 'POST' && pathname === '/api/workouts/clone-only') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const { benchmarkId, sourceTable, modifications } = req.body;
+        
+        if (!benchmarkId || !sourceTable) {
+          return res.status(400).json({ error: 'benchmarkId and sourceTable are required' });
+        }
+
+        // Get the benchmark workout
+        let benchmarkWorkout;
+        switch (sourceTable) {
+          case 'girl_wods':
+            benchmarkWorkout = await db.select().from(girlWods).where(eq(girlWods.id, benchmarkId)).limit(1);
+            break;
+          case 'hero_wods':
+            benchmarkWorkout = await db.select().from(heroWods).where(eq(heroWods.id, benchmarkId)).limit(1);
+            break;
+          case 'notables':
+            benchmarkWorkout = await db.select().from(notables).where(eq(notables.id, benchmarkId)).limit(1);
+            break;
+          default:
+            return res.status(400).json({ error: 'Invalid source table' });
+        }
+
+        if (!benchmarkWorkout || benchmarkWorkout.length === 0) {
+          return res.status(404).json({ error: 'Benchmark workout not found' });
+        }
+
+        const original = benchmarkWorkout[0];
+
+        // Create custom workout with modifications
+        const customWorkout = await db.insert(customUserWorkouts).values({
+          name: modifications?.name || `${original.name} (Modified)`,
+          workoutType: modifications?.workoutType || original.workoutType as any,
+          scoring: modifications?.scoring || original.scoring,
+          timeCap: modifications?.timeCap !== undefined ? modifications.timeCap : original.timeCap,
+          workoutDescription: modifications?.workoutDescription || original.workoutDescription,
+          relatedBenchmark: original.name,
+          userId: userData.id
+        }).returning();
+
+        return res.json({
+          success: true,
+          workout: customWorkout[0],
+          message: 'Benchmark cloned and modified successfully'
+        });
+      } catch (error) {
+        console.error('Error cloning workout:', error);
+        return res.status(500).json({ error: 'Failed to clone workout' });
+      }
+    }
+
+    // Edit Existing Custom Workout
+    if (method === 'PUT' && pathname.match(/^\/api\/workouts\/custom\/\d+$/)) {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const workoutId = parseInt(pathname.split('/').pop()!);
+        const updates = req.body;
+
+        // Check if workout exists and belongs to user
+        const existingWorkout = await db.select().from(customUserWorkouts)
+          .where(and(eq(customUserWorkouts.id, workoutId), eq(customUserWorkouts.userId, userData.id)))
+          .limit(1);
+
+        if (existingWorkout.length === 0) {
+          return res.status(404).json({ error: 'Custom workout not found or access denied' });
+        }
+
+        // Update the workout
+        const updatedWorkout = await db.update(customUserWorkouts)
+          .set(updates)
+          .where(eq(customUserWorkouts.id, workoutId))
+          .returning();
+
+        return res.json({
+          success: true,
+          workout: updatedWorkout[0],
+          message: 'Custom workout updated successfully'
+        });
+      } catch (error) {
+        console.error('Error updating custom workout:', error);
+        return res.status(500).json({ error: 'Failed to update custom workout' });
+      }
+    }
+
+    // Get User's Workout Assignments for Calendar
+    if (method === 'GET' && pathname.match(/^\/api\/calendar\/assignments\/[^\/]+$/)) {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const targetUserId = pathname.split('/').pop()!;
+        const { date } = req.query;
+
+        // Check if user is requesting their own assignments
+        if (targetUserId !== userData.id) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+
+        let assignments;
+        if (date) {
+          assignments = await db.select().from(userWorkoutAssignments)
+            .where(and(
+              eq(userWorkoutAssignments.userId, userData.id),
+              eq(userWorkoutAssignments.assignedDate, date as string)
+            ))
+            .orderBy(desc(userWorkoutAssignments.createdAt));
+        } else {
+          assignments = await db.select().from(userWorkoutAssignments)
+            .where(eq(userWorkoutAssignments.userId, userData.id))
+            .orderBy(desc(userWorkoutAssignments.createdAt));
+        }
+
+        // Enrich assignments with workout details
+        const enrichedAssignments = await Promise.all(
+          assignments.map(async (assignment) => {
+            let workoutDetails: any = null;
+            
+            switch (assignment.workoutSource) {
+              case 'custom_user':
+                const customUser = await db.select().from(customUserWorkouts)
+                  .where(eq(customUserWorkouts.id, assignment.workoutId)).limit(1);
+                workoutDetails = customUser[0] || null;
+                break;
+              case 'custom_community':
+                const customCommunity = await db.select().from(customCommunityWorkouts)
+                  .where(eq(customCommunityWorkouts.id, assignment.workoutId)).limit(1);
+                workoutDetails = customCommunity[0] || null;
+                break;
+              case 'girl_wod':
+                const girlWod = await db.select().from(girlWods)
+                  .where(eq(girlWods.id, assignment.workoutId)).limit(1);
+                workoutDetails = girlWod[0] || null;
+                break;
+              case 'hero_wod':
+                const heroWod = await db.select().from(heroWods)
+                  .where(eq(heroWods.id, assignment.workoutId)).limit(1);
+                workoutDetails = heroWod[0] || null;
+                break;
+              case 'notable':
+                const notable = await db.select().from(notables)
+                  .where(eq(notables.id, assignment.workoutId)).limit(1);
+                workoutDetails = notable[0] || null;
+                break;
+            }
+
+            return {
+              ...assignment,
+              workout: workoutDetails,
+              isUserWorkout: assignment.workoutSource === 'custom_user',
+              isCommunityWorkout: assignment.workoutSource === 'custom_community'
+            };
+          })
+        );
+
+        return res.json({
+          assignments: enrichedAssignments,
+          date: date || null
+        });
+      } catch (error) {
+        console.error('Error fetching user assignments:', error);
+        return res.status(500).json({ error: 'Failed to fetch workout assignments' });
+      }
+    }
+
+    // Clone Benchmark Workout (Without Date Assignment)
+    if (method === 'POST' && pathname === '/api/workouts/clone-benchmark') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const { benchmarkId, sourceTable, modifications, communityId } = req.body;
+        
+        if (!benchmarkId || !sourceTable) {
+          return res.status(400).json({ 
+            error: 'Missing required fields',
+            details: 'benchmarkId and sourceTable are required'
+          });
+        }
+
+        // Get the benchmark workout from the appropriate table
+        let benchmarkWorkout;
+        let tableMap = {
+          'girl_wods': girlWods,
+          'hero_wods': heroWods,
+          'notables': notables
+        };
+
+        const table = tableMap[sourceTable as keyof typeof tableMap];
+        if (!table) {
+          return res.status(400).json({ 
+            error: 'Invalid source table',
+            details: `sourceTable must be one of: girl_wods, hero_wods, notables`
+          });
+        }
+
+        const benchmarkResults = await db.select().from(table).where(eq(table.id, benchmarkId));
+        benchmarkWorkout = benchmarkResults[0];
+
+        if (!benchmarkWorkout) {
+          return res.status(404).json({ 
+            error: 'Benchmark workout not found' 
+          });
+        }
+
+        // Create the cloned workout with modifications
+        const clonedWorkout = {
+          name: modifications?.name || benchmarkWorkout.name,
+          workoutType: modifications?.workoutType || benchmarkWorkout.workoutType,
+          scoring: modifications?.scoring || benchmarkWorkout.scoring,
+          timeCap: modifications?.timeCap !== undefined ? modifications.timeCap : benchmarkWorkout.timeCap,
+          workoutDescription: modifications?.workoutDescription || benchmarkWorkout.workoutDescription,
+          relatedBenchmark: benchmarkWorkout.name,
+          userId: userData.id
+        };
+
+        // Insert the cloned workout into custom user workouts
+        const insertResult = await db.insert(customUserWorkouts).values(clonedWorkout).returning();
+        const newWorkout = insertResult[0];
+
+        return res.status(200).json({
+          success: true,
+          message: 'Benchmark workout cloned successfully',
+          workout: newWorkout,
+          originalBenchmark: {
+            id: benchmarkWorkout.id,
+            name: benchmarkWorkout.name,
+            source: sourceTable
+          }
+        });
+
+      } catch (error) {
+        console.error('Clone benchmark error:', error);
+        return res.status(500).json({ 
+          error: 'Failed to clone benchmark workout',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    // Get Available Workouts for Assignment
+    if (method === 'GET' && pathname === '/api/workouts/available-for-assignment') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        // Get all available workouts for assignment
+        const [userCustom, girlWodsList, heroWodsList, notablesList] = await Promise.all([
+          db.select().from(customUserWorkouts).where(eq(customUserWorkouts.userId, userData.id)),
+          db.select().from(girlWods),
+          db.select().from(heroWods),
+          db.select().from(notables)
+        ]);
+
+        const availableWorkouts = [
+          ...userCustom.map(w => ({ ...w, source: 'custom_user', category: 'User Custom' })),
+          ...girlWodsList.map(w => ({ ...w, source: 'girl_wod', category: 'Girl WODs' })),
+          ...heroWodsList.map(w => ({ ...w, source: 'hero_wod', category: 'Hero WODs' })),
+          ...notablesList.map(w => ({ ...w, source: 'notable', category: 'Notable WODs' }))
+        ];
+
+        return res.json({
+          workouts: availableWorkouts,
+          count: availableWorkouts.length
+        });
+      } catch (error) {
+        console.error('Error fetching available workouts:', error);
+        return res.status(500).json({ error: 'Failed to fetch available workouts' });
+      }
+    }
+
+    // Remove Workout Assignment
+    if (method === 'DELETE' && pathname.match(/^\/api\/assignments\/\d+$/)) {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const assignmentId = parseInt(pathname.split('/').pop()!);
+
+        // Check if assignment exists and belongs to user
+        const existingAssignment = await db.select().from(userWorkoutAssignments)
+          .where(and(eq(userWorkoutAssignments.id, assignmentId), eq(userWorkoutAssignments.userId, userData.id)))
+          .limit(1);
+
+        if (existingAssignment.length === 0) {
+          return res.status(404).json({ error: 'Assignment not found or access denied' });
+        }
+
+        // Delete the assignment
+        await db.delete(userWorkoutAssignments).where(eq(userWorkoutAssignments.id, assignmentId));
+
+        return res.json({
+          success: true,
+          message: 'Workout assignment removed successfully'
+        });
+      } catch (error) {
+        console.error('Error removing assignment:', error);
+        return res.status(500).json({ error: 'Failed to remove workout assignment' });
+      }
+    }
+
+    // Get My Custom Workouts
+    if (method === 'GET' && pathname === '/api/workouts/custom/my') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const customWorkouts = await db.select().from(customUserWorkouts)
+          .where(eq(customUserWorkouts.userId, userData.id))
+          .orderBy(desc(customUserWorkouts.createdAt));
+
+        return res.json({
+          workouts: customWorkouts,
+          count: customWorkouts.length
+        });
+      } catch (error) {
+        console.error('Error fetching custom workouts:', error);
+        return res.status(500).json({ error: 'Failed to fetch custom workouts' });
+      }
+    }
+
+    // Get User Workout Assignments
+    if (method === 'GET' && pathname === '/api/workouts/assignments') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const { date, userId } = req.query;
+
+        // Verify user can only access their own assignments
+        if (userId && userId !== userData.id) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+
+        const targetUserId = userId || userData.id;
+
+        let whereClause;
+        
+        if (date && typeof date === 'string') {
+          whereClause = and(
+            eq(userWorkoutAssignments.userId, targetUserId as string),
+            eq(userWorkoutAssignments.assignedDate, date)
+          );
+        } else {
+          whereClause = eq(userWorkoutAssignments.userId, targetUserId as string);
+        }
+
+        // Get user's workout assignments
+        const assignments = await db
+          .select()
+          .from(userWorkoutAssignments)
+          .where(whereClause)
+          .orderBy(userWorkoutAssignments.assignedDate);
+
+        // Fetch workout details based on source
+        const enrichedAssignments: any[] = [];
+        
+        for (const assignment of assignments) {
+          let workoutDetails: any = null;
+          
+          switch (assignment.workoutSource) {
+            case 'girl_wod':
+              const girlWodResults = await db
+                .select()
+                .from(girlWods)
+                .where(eq(girlWods.id, assignment.workoutId))
+                .limit(1);
+              workoutDetails = girlWodResults[0];
+              break;
+              
+            case 'hero_wod':
+              const heroWodResults = await db
+                .select()
+                .from(heroWods)
+                .where(eq(heroWods.id, assignment.workoutId))
+                .limit(1);
+              workoutDetails = heroWodResults[0];
+              break;
+              
+            case 'notable':
+              const notableResults = await db
+                .select()
+                .from(notables)
+                .where(eq(notables.id, assignment.workoutId))
+                .limit(1);
+              workoutDetails = notableResults[0];
+              break;
+              
+            case 'custom_user':
+              const customUserResults = await db
+                .select()
+                .from(customUserWorkouts)
+                .where(eq(customUserWorkouts.id, assignment.workoutId))
+                .limit(1);
+              workoutDetails = customUserResults[0];
+              break;
+              
+            case 'custom_community':
+              const customCommunityResults = await db
+                .select()
+                .from(customCommunityWorkouts)
+                .where(eq(customCommunityWorkouts.id, assignment.workoutId))
+                .limit(1);
+              workoutDetails = customCommunityResults[0];
+              break;
+          }
+          
+          if (workoutDetails) {
+            enrichedAssignments.push({
+              ...assignment,
+              workout: {
+                ...workoutDetails,
+                description: workoutDetails.workoutDescription || workoutDetails.description,
+                type: workoutDetails.workoutType || workoutDetails.type
+              }
+            });
+          }
+        }
+
+        return res.status(200).json(enrichedAssignments);
+      } catch (error) {
+        console.error("Error fetching workout assignments:", error);
+        return res.status(500).json({
+          error: "Failed to fetch workout assignments"
+        });
       }
     }
 

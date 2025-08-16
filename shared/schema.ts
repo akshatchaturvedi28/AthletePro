@@ -176,6 +176,15 @@ export const liftTypeEnum = pgEnum("lift_type", [
   "core"
 ]);
 
+// Workout source enum for assignments
+export const workoutSourceEnum = pgEnum("workout_source", [
+  "custom_user",
+  "custom_community", 
+  "girl_wod",
+  "hero_wod",
+  "notable"
+]);
+
 // Workouts table
 export const workouts = pgTable("workouts", {
   id: serial("id").primaryKey(),
@@ -356,6 +365,27 @@ export const communityGoals = pgTable("community_goals", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// User workout assignments - Maps workouts to dates for individual users
+export const userWorkoutAssignments = pgTable("user_workout_assignments", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  assignedDate: date("assigned_date").notNull(),
+  workoutId: integer("workout_id").notNull(),
+  workoutSource: workoutSourceEnum("workout_source").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Community workout assignments - Maps workouts to dates for communities
+export const communityWorkoutAssignments = pgTable("community_workout_assignments", {
+  id: serial("id").primaryKey(),
+  communityId: integer("community_id").notNull().references(() => communities.id),
+  assignedDate: date("assigned_date").notNull(),
+  workoutId: integer("workout_id").notNull(),
+  workoutSource: workoutSourceEnum("workout_source").notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   communities: many(communities),
@@ -481,6 +511,16 @@ export const insertCustomUserWorkoutSchema = createInsertSchema(customUserWorkou
   createdAt: true,
 });
 
+export const insertUserWorkoutAssignmentSchema = createInsertSchema(userWorkoutAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCommunityWorkoutAssignmentSchema = createInsertSchema(communityWorkoutAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -519,6 +559,10 @@ export type CustomCommunityWorkout = typeof customCommunityWorkouts.$inferSelect
 export type InsertCustomCommunityWorkout = z.infer<typeof insertCustomCommunityWorkoutSchema>;
 export type CustomUserWorkout = typeof customUserWorkouts.$inferSelect;
 export type InsertCustomUserWorkout = z.infer<typeof insertCustomUserWorkoutSchema>;
+export type UserWorkoutAssignment = typeof userWorkoutAssignments.$inferSelect;
+export type InsertUserWorkoutAssignment = z.infer<typeof insertUserWorkoutAssignmentSchema>;
+export type CommunityWorkoutAssignment = typeof communityWorkoutAssignments.$inferSelect;
+export type InsertCommunityWorkoutAssignment = z.infer<typeof insertCommunityWorkoutAssignmentSchema>;
 
 // Extended types for authentication
 export type UserWithMembership = User & {

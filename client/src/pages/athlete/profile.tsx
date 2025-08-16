@@ -74,15 +74,15 @@ export default function AthleteProfile() {
         username: user.username || "",
         email: user.email || "",
         phoneNumber: user.phoneNumber || "",
-        occupation: user.occupation || "",
-        bodyWeight: user.bodyWeight || "",
-        bodyHeight: user.bodyHeight || "",
-        yearsOfExperience: user.yearsOfExperience?.toString() || "",
-        bio: user.bio || "",
+        occupation: (user as any).occupation || "",
+        bodyWeight: (user as any).bodyWeight || "",
+        bodyHeight: (user as any).bodyHeight || "",
+        yearsOfExperience: (user as any).yearsOfExperience?.toString() || "",
+        bio: (user as any).bio || "",
         socialHandles: {
-          instagram: user.socialHandles?.instagram || "",
-          facebook: user.socialHandles?.facebook || "",
-          twitter: user.socialHandles?.twitter || ""
+          instagram: (user as any).socialHandles?.instagram || "",
+          facebook: (user as any).socialHandles?.facebook || "",
+          twitter: (user as any).socialHandles?.twitter || ""
         }
       });
     }
@@ -169,17 +169,28 @@ export default function AthleteProfile() {
       
       <div className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
+          {/* Enhanced Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
-                <p className="text-gray-600 mt-2">Manage your personal information</p>
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-blue-600/20 rounded-lg blur opacity-30"></div>
+                <div className="relative">
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                    Profile Settings 👤
+                  </h1>
+                  <p className="text-gray-600 mt-2 text-lg">
+                    Manage your personal information and preferences
+                  </p>
+                </div>
               </div>
               
               <Button
                 onClick={() => setIsEditing(!isEditing)}
                 variant={isEditing ? "outline" : "default"}
+                className={isEditing 
+                  ? "hover:bg-gradient-to-r hover:from-primary/10 hover:to-blue-600/10 hover:border-primary/30 transition-all duration-200"
+                  : "bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                }
               >
                 {isEditing ? "Cancel" : <><Edit3 className="h-4 w-4 mr-2" />Edit Profile</>}
               </Button>
@@ -187,18 +198,22 @@ export default function AthleteProfile() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Profile Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <User className="h-5 w-5 mr-2" />
-                  Profile Overview
+            {/* Enhanced Profile Overview */}
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg">
+                <CardTitle className="flex items-center text-xl">
+                  <div className="bg-gradient-to-r from-primary to-blue-600 p-2 rounded-lg mr-3">
+                    <User className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                    Profile Overview
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center space-x-6 mb-6">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={user?.profileImageUrl} />
+                    <AvatarImage src={(user as any)?.profileImageUrl || undefined} />
                     <AvatarFallback className="text-xl">
                       {user?.firstName?.[0]}{user?.lastName?.[0]}
                     </AvatarFallback>
@@ -209,17 +224,17 @@ export default function AthleteProfile() {
                       <h2 className="text-2xl font-bold">
                         {user?.firstName} {user?.lastName}
                       </h2>
-                      {user?.membership && (
+                      {(user as any)?.membership && (
                         <Badge variant="outline">
                           <Users className="h-4 w-4 mr-1" />
-                          {user.membership.role}
+                          {(user as any).membership.role}
                         </Badge>
                       )}
                     </div>
                     <p className="text-gray-600">{user?.email}</p>
-                    {user?.membership?.community && (
+                    {(user as any)?.membership?.community && (
                       <p className="text-sm text-primary">
-                        Member of {user.membership.community.name}
+                        Member of {(user as any).membership.community.name}
                       </p>
                     )}
                   </div>
@@ -270,52 +285,62 @@ export default function AthleteProfile() {
               </CardContent>
             </Card>
 
-            {/* Contact Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Phone className="h-5 w-5 mr-2" />
-                  Contact Information
+            {/* Enhanced Contact Information */}
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg">
+                <CardTitle className="flex items-center text-xl">
+                  <div className="bg-gradient-to-r from-primary to-blue-600 p-2 rounded-lg mr-3">
+                    <Phone className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                    Contact Information
+                  </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <Label htmlFor="phoneNumber" className="text-sm font-medium text-gray-700">Phone Number</Label>
                     <Input
                       id="phoneNumber"
                       type="tel"
                       value={formData.phoneNumber}
                       onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
                       disabled={!isEditing}
+                      className="mt-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="occupation">Occupation</Label>
+                    <Label htmlFor="occupation" className="text-sm font-medium text-gray-700">Occupation</Label>
                     <Input
                       id="occupation"
                       value={formData.occupation}
                       onChange={(e) => handleInputChange("occupation", e.target.value)}
                       disabled={!isEditing}
+                      className="mt-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Body Metrics */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Target className="h-5 w-5 mr-2" />
-                  Body Metrics
+            {/* Enhanced Body Metrics */}
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg">
+                <CardTitle className="flex items-center text-xl">
+                  <div className="bg-gradient-to-r from-primary to-blue-600 p-2 rounded-lg mr-3">
+                    <Target className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                    Body Metrics
+                  </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <Label htmlFor="bodyWeight">Weight (lbs)</Label>
+                    <Label htmlFor="bodyWeight" className="text-sm font-medium text-gray-700">Weight (lbs)</Label>
                     <Input
                       id="bodyWeight"
                       type="number"
@@ -323,11 +348,12 @@ export default function AthleteProfile() {
                       value={formData.bodyWeight}
                       onChange={(e) => handleInputChange("bodyWeight", e.target.value)}
                       disabled={!isEditing}
+                      className="mt-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="bodyHeight">Height (inches)</Label>
+                    <Label htmlFor="bodyHeight" className="text-sm font-medium text-gray-700">Height (inches)</Label>
                     <Input
                       id="bodyHeight"
                       type="number"
@@ -335,34 +361,40 @@ export default function AthleteProfile() {
                       value={formData.bodyHeight}
                       onChange={(e) => handleInputChange("bodyHeight", e.target.value)}
                       disabled={!isEditing}
+                      className="mt-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="yearsOfExperience">Years of Experience</Label>
+                    <Label htmlFor="yearsOfExperience" className="text-sm font-medium text-gray-700">Years of Experience</Label>
                     <Input
                       id="yearsOfExperience"
                       type="number"
                       value={formData.yearsOfExperience}
                       onChange={(e) => handleInputChange("yearsOfExperience", e.target.value)}
                       disabled={!isEditing}
+                      className="mt-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Bio */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Edit3 className="h-5 w-5 mr-2" />
-                  Bio
+            {/* Enhanced Bio */}
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg">
+                <CardTitle className="flex items-center text-xl">
+                  <div className="bg-gradient-to-r from-primary to-blue-600 p-2 rounded-lg mr-3">
+                    <Edit3 className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                    Bio
+                  </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6">
                 <div>
-                  <Label htmlFor="bio">About Me</Label>
+                  <Label htmlFor="bio" className="text-sm font-medium text-gray-700">About Me</Label>
                   <Textarea
                     id="bio"
                     value={formData.bio}
@@ -370,59 +402,73 @@ export default function AthleteProfile() {
                     disabled={!isEditing}
                     rows={4}
                     placeholder="Tell us about yourself..."
+                    className="mt-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
                   />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Social Media */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Instagram className="h-5 w-5 mr-2" />
-                  Social Media
+            {/* Enhanced Social Media */}
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg">
+                <CardTitle className="flex items-center text-xl">
+                  <div className="bg-gradient-to-r from-primary to-blue-600 p-2 rounded-lg mr-3">
+                    <Instagram className="h-5 w-5 text-white" />
+                  </div>
+                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                    Social Media
+                  </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <Label htmlFor="instagram">Instagram</Label>
-                    <div className="flex items-center space-x-2">
-                      <Instagram className="h-4 w-4 text-pink-600" />
+                    <Label htmlFor="instagram" className="text-sm font-medium text-gray-700">Instagram</Label>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <div className="bg-gradient-to-r from-pink-500 to-purple-500 p-2 rounded-lg">
+                        <Instagram className="h-4 w-4 text-white" />
+                      </div>
                       <Input
                         id="instagram"
                         value={formData.socialHandles.instagram}
                         onChange={(e) => handleInputChange("socialHandles.instagram", e.target.value)}
                         disabled={!isEditing}
                         placeholder="@username"
+                        className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       />
                     </div>
                   </div>
                   
                   <div>
-                    <Label htmlFor="facebook">Facebook</Label>
-                    <div className="flex items-center space-x-2">
-                      <Facebook className="h-4 w-4 text-blue-600" />
+                    <Label htmlFor="facebook" className="text-sm font-medium text-gray-700">Facebook</Label>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-2 rounded-lg">
+                        <Facebook className="h-4 w-4 text-white" />
+                      </div>
                       <Input
                         id="facebook"
                         value={formData.socialHandles.facebook}
                         onChange={(e) => handleInputChange("socialHandles.facebook", e.target.value)}
                         disabled={!isEditing}
                         placeholder="facebook.com/username"
+                        className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       />
                     </div>
                   </div>
                   
                   <div>
-                    <Label htmlFor="twitter">Twitter</Label>
-                    <div className="flex items-center space-x-2">
-                      <Twitter className="h-4 w-4 text-blue-400" />
+                    <Label htmlFor="twitter" className="text-sm font-medium text-gray-700">Twitter</Label>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <div className="bg-gradient-to-r from-sky-400 to-blue-500 p-2 rounded-lg">
+                        <Twitter className="h-4 w-4 text-white" />
+                      </div>
                       <Input
                         id="twitter"
                         value={formData.socialHandles.twitter}
                         onChange={(e) => handleInputChange("socialHandles.twitter", e.target.value)}
                         disabled={!isEditing}
                         placeholder="@username"
+                        className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                       />
                     </div>
                   </div>
@@ -430,13 +476,13 @@ export default function AthleteProfile() {
               </CardContent>
             </Card>
 
-            {/* Save Button */}
+            {/* Enhanced Save Button */}
             {isEditing && (
               <div className="flex justify-end">
                 <Button
                   type="submit"
                   disabled={updateProfileMutation.isPending}
-                  className="bg-primary hover:bg-primary/90"
+                  className="bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                 >
                   {updateProfileMutation.isPending ? (
                     <>

@@ -19,7 +19,6 @@ interface ParsedWorkout {
   timeCap?: number;
   restBetweenIntervals?: number;
   totalEffort?: number;
-  relatedBenchmark?: string;
   barbellLifts?: string[];
   date?: string;
 }
@@ -177,7 +176,7 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
         <CardHeader>
           <CardTitle className="flex items-center">
             <Zap className="h-5 w-5 mr-2 text-primary" />
-            🧠 PRD Phase 1 Workout Parser
+            Smart Workout Parser
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -242,7 +241,7 @@ AMRAP 20 minutes:
           <CardHeader>
             <CardTitle className="flex items-center">
               <Target className="h-5 w-5 mr-2 text-accent" />
-              🧠 PRD Analysis Results
+              📊 Analysis Results
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -408,11 +407,6 @@ AMRAP 20 minutes:
                     </div>
                   )}
                   
-                  {parsedWorkout.relatedBenchmark && (
-                    <div className="flex items-center">
-                      <Badge variant="outline">{parsedWorkout.relatedBenchmark}</Badge>
-                    </div>
-                  )}
                   
                   {parsedWorkout.barbellLifts && parsedWorkout.barbellLifts.length > 0 && (
                     <div className="flex items-center">

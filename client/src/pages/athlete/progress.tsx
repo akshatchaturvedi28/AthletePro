@@ -38,17 +38,22 @@ export default function AthleteProgress() {
       
       <div className="flex-1 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
+          {/* Enhanced Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-                  <TrendingUp className="h-8 w-8 mr-3 text-primary" />
-                  Progress Tracking
-                </h1>
-                <p className="text-gray-600 mt-2">
-                  Monitor your fitness journey and track improvements over time
-                </p>
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-blue-600/20 rounded-lg blur opacity-30"></div>
+                <div className="relative">
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent flex items-center">
+                    <div className="bg-gradient-to-r from-primary to-blue-600 p-2 rounded-lg mr-4">
+                      <TrendingUp className="h-6 w-6 text-white" />
+                    </div>
+                    Progress Tracking 📈
+                  </h1>
+                  <p className="text-gray-600 mt-2 text-lg ml-14">
+                    Monitor your fitness journey and track improvements over time
+                  </p>
+                </div>
               </div>
             </div>
           </div>
