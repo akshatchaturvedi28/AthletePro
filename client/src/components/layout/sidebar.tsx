@@ -90,7 +90,7 @@ export function Sidebar({ className }: SidebarProps) {
   const navigation = isCoach ? coachNavigation : athleteNavigation;
 
   return (
-    <div className={cn("flex flex-col w-64 bg-white border-r border-gray-200", className)}>
+    <div className={cn("fixed left-0 top-0 z-40 flex flex-col w-64 h-screen bg-white border-r border-gray-200", className)}>
       <div className="flex items-center h-16 px-6 border-b border-gray-200">
         <Dumbbell className="h-6 w-6 text-primary mr-2" />
         <span className="text-xl font-bold text-secondary">ACrossFit</span>

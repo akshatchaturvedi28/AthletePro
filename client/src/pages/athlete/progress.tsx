@@ -33,10 +33,10 @@ export default function AthleteProgress() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-gray-50">
       <Sidebar />
       
-      <div className="flex-1 p-6">
+      <div className="ml-64 p-6">
         <div className="max-w-7xl mx-auto">
           {/* Enhanced Header */}
           <div className="mb-8">
