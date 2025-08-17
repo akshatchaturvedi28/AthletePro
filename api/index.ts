@@ -208,11 +208,11 @@ const insertWorkoutSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   type: z.enum(["for_time", "amrap", "emom", "tabata", "strength", "interval", "endurance", "chipper", "ladder", "unbroken"]),
-  timeCap: z.number().optional(),
-  totalEffort: z.number().optional(),
+  timeCap: z.number().nullable().optional(),
+  totalEffort: z.number().nullable().optional(),
   barbellLifts: z.array(z.string()).optional(),
   createdBy: z.string(),
-  communityId: z.number().optional(),
+  communityId: z.number().nullable().optional(),
   isPublic: z.boolean().optional(),
 });
 
@@ -323,120 +323,96 @@ function levenshteinDistance(str1: string, str2: string): number {
   return matrix[str2.length][str1.length];
 }
 
+// Enhanced Multi-Entity Workout Parsing for Production
 async function parseWorkout(rawText: string, userId: string) {
   try {
+    console.log('🚀 Starting Enhanced Multi-Entity Workout Parsing...');
+    
     // Load workout database tables
     const girlWodsList = await db.select().from(girlWods);
     const heroWodsList = await db.select().from(heroWods);
     const notablesList = await db.select().from(notables);
     const barbellLiftsList = await db.select().from(barbellLifts);
 
-    const cleanText = rawText.toLowerCase().trim();
-    
-    // Step 1: Check for known Girl WODs
-    for (const workout of girlWodsList) {
-      const workoutName = workout.name.toLowerCase();
-      const distance = levenshteinDistance(cleanText.substring(0, 50), workoutName);
-      
-      if (cleanText.includes(workoutName) || distance <= 2) {
-        return {
-          workoutFound: true,
-          confidence: 0.9,
-          matchedCategory: 'girls',
-          workoutData: {
-            name: workout.name,
-            workoutDescription: workout.workoutDescription,
-            workoutType: workout.workoutType,
-            scoring: workout.scoring,
-            timeCap: workout.timeCap,
-            totalEffort: workout.totalEffort,
-            barbellLifts: workout.barbellLifts as string[] || [],
-            sourceTable: 'girl_wods',
-            databaseId: workout.id
-          },
-          suggestedWorkouts: []
-        };
-      }
+    // Step 1: Enhanced Input Preprocessing
+    const cleanedInput = rawText.trim()
+      .replace(/\r\n/g, '\n')
+      .replace(/\t/g, ' ')
+      .replace(/\s+(?=\n)/g, '')
+      .replace(/\n{3,}/g, '\n\n');
+
+    if (!cleanedInput) {
+      return {
+        workoutFound: false,
+        confidence: 0,
+        matchedCategory: 'unknown',
+        errors: ['Invalid or empty input provided'],
+        suggestedWorkouts: []
+      };
     }
 
-    // Step 2: Check for known Hero WODs
-    for (const workout of heroWodsList) {
-      const workoutName = workout.name.toLowerCase();
-      const distance = levenshteinDistance(cleanText.substring(0, 50), workoutName);
-      
-      if (cleanText.includes(workoutName) || distance <= 2) {
-        return {
-          workoutFound: true,
-          confidence: 0.9,
-          matchedCategory: 'heroes',
-          workoutData: {
-            name: workout.name,
-            workoutDescription: workout.workoutDescription,
-            workoutType: workout.workoutType,
-            scoring: workout.scoring,
-            timeCap: workout.timeCap,
-            totalEffort: workout.totalEffort,
-            barbellLifts: workout.barbellLifts as string[] || [],
-            sourceTable: 'hero_wods',
-            databaseId: workout.id
-          },
-          suggestedWorkouts: []
-        };
-      }
+    // Step 2: Enhanced Date Extraction
+    const extractedDate = extractDateEnhanced(cleanedInput);
+
+    // Step 3: Split into Entities using Enhanced Algorithm
+    const entities = splitWODIntoEntitiesEnhanced(cleanedInput);
+    console.log(`📊 Found ${entities.length} workout entities`);
+
+    if (entities.length === 0) {
+      return {
+        workoutFound: false,
+        confidence: 0,
+        matchedCategory: 'unknown',
+        errors: ['No workout entities could be identified'],
+        suggestedWorkouts: []
+      };
     }
 
-    // Step 3: Check for known Notable WODs
-    for (const workout of notablesList) {
-      const workoutName = workout.name.toLowerCase();
-      const distance = levenshteinDistance(cleanText.substring(0, 50), workoutName);
-      
-      if (cleanText.includes(workoutName) || distance <= 2) {
-        return {
-          workoutFound: true,
-          confidence: 0.9,
-          matchedCategory: 'notables',
-          workoutData: {
-            name: workout.name,
-            workoutDescription: workout.workoutDescription,
-            workoutType: workout.workoutType,
-            scoring: workout.scoring,
-            timeCap: workout.timeCap,
-            totalEffort: workout.totalEffort,
-            barbellLifts: workout.barbellLifts as string[] || [],
-            sourceTable: 'notables',
-            databaseId: workout.id
-          },
-          suggestedWorkouts: []
-        };
-      }
+    // Step 4: Parse Each Entity
+    const parsedEntities: any[] = [];
+    let overallConfidence = 0;
+
+    for (let i = 0; i < entities.length; i++) {
+      const entity = entities[i];
+      console.log(`🔍 Processing entity ${i + 1}: "${entity.detectedName || 'Unnamed'}"`);
+
+      // Parse as custom workout
+      const customWorkout = parseAsCustomWorkoutEnhanced(entity, extractedDate, barbellLiftsList);
+      parsedEntities.push(customWorkout);
+      overallConfidence += 0.8;
     }
 
-    // Step 4: Parse as custom workout
-    const workoutName = extractWorkoutName(rawText);
-    const workoutType = detectWorkoutType(cleanText);
-    const timeCap = extractTimeCap(rawText);
-    const barbellLiftsFound = identifyBarbellLifts(rawText, barbellLiftsList);
-    
-    return {
+    const finalConfidence = Math.min(overallConfidence / entities.length, 1.0);
+
+    // Maintain backward compatibility with single entity response
+    const response: any = {
       workoutFound: true,
-      confidence: 0.8,
-      matchedCategory: 'new_custom',
-      workoutData: {
-        name: workoutName,
-        workoutDescription: rawText,
-        workoutType: workoutType,
-        scoring: workoutType === 'for_time' ? 'Time' : workoutType === 'amrap' ? 'Rounds + Reps' : 'Points',
-        timeCap: timeCap,
-        totalEffort: calculateTotalEffort(rawText),
-        barbellLifts: barbellLiftsFound,
-        sourceTable: 'custom',
-        databaseId: null
-      },
+      confidence: finalConfidence,
+      matchedCategory: parsedEntities.length === 1 ? parsedEntities[0].category || 'custom_user' : 'multi_entity',
+      workoutEntities: parsedEntities,
+      extractedDate,
       suggestedWorkouts: generateSuggestions(rawText, [...girlWodsList, ...heroWodsList, ...notablesList])
     };
 
+    // For backward compatibility, add workoutData for single entity
+    if (parsedEntities.length === 1) {
+      response.workoutData = {
+        name: parsedEntities[0].name,
+        workoutDescription: parsedEntities[0].workoutDescription,
+        workoutType: parsedEntities[0].workoutType,
+        scoring: parsedEntities[0].scoring,
+        timeCap: parsedEntities[0].timeCap,
+        totalEffort: parsedEntities[0].totalEffort,
+        barbellLifts: parsedEntities[0].barbellLifts,
+        sourceTable: parsedEntities[0].sourceTable,
+        databaseId: parsedEntities[0].databaseId
+      };
+    }
+
+    return response;
+
   } catch (error) {
-    console.error('Workout parsing error:', error);
+    console.error('Enhanced workout parsing error:', error);
     return {
       workoutFound: false,
       confidence: 0,
@@ -445,6 +421,381 @@ async function parseWorkout(rawText: string, userId: string) {
       suggestedWorkouts: []
     };
   }
+}
+
+// Enhanced helper functions for production API
+function extractDateEnhanced(input: string): string | undefined {
+  let dateMatch: RegExpMatchArray | null = null;
+  const lines = input.split('\n');
+  
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    if (!dateMatch) {
+      dateMatch = lines[i].match(/(\d{1,2}-\w+-\d{4})/) || lines[i].match(/\*(\d{2}-\w+-\d{4})/);
+      if (dateMatch && dateMatch[2]) dateMatch[1] = dateMatch[2];
+    }
+  }
+
+  return dateMatch ? dateMatch[1] : undefined;
+}
+
+function splitWODIntoEntitiesEnhanced(input: string): any[] {
+  console.log('🚀 ENTITY SPLITTING: Starting enhanced multi-entity parsing');
+  
+  const lines = input.split('\n');
+  const entities: any[] = [];
+  
+  // Remove date/day lines from the beginning
+  let startIndex = 0;
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    const line = lines[i].trim();
+    if (isDateLineEnhanced(line) || line === '') {
+      startIndex = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  console.log(`📋 Processing lines ${startIndex} to ${lines.length - 1}`);
+
+  // Step 1: Identify all section boundaries
+  const sectionBoundaries: Array<{
+    index: number;
+    name: string;
+    type: string;
+    line: string;
+  }> = [];
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+    const cleanLine = line.trim();
+    
+    if (!cleanLine || isDateLineEnhanced(cleanLine)) continue;
+    
+    // Check for section patterns
+    let sectionName = '';
+    let sectionType = '';
+    
+    // 1. Exact section headers: STRENGTH, WORKOUT, etc.
+    if (cleanLine.match(/^(STRENGTH|WORKOUT|SKILL|GYMNASTICS|MINI-PUMP|ACCESSORY|METCON|WOD|CONDITIONING)$/i)) {
+      sectionName = cleanLine.toUpperCase();
+      sectionType = 'section_header';
+      console.log(`🎯 Found section header at line ${i}: "${sectionName}"`);
+    }
+    // 2. Named workout pattern: "Workout : Name"
+    else if (cleanLine.match(/^(workout|wod)\s*:\s*(.+)$/i)) {
+      const match = cleanLine.match(/^(workout|wod)\s*:\s*(.+)$/i);
+      sectionName = match![2].trim();
+      sectionType = 'named_workout';
+      console.log(`🎯 Found named workout at line ${i}: "${sectionName}"`);
+    }
+    // 3. All caps headers (selective)
+    else if (cleanLine.match(/^[A-Z][A-Z\s&-]{2,}:?\s*$/) && 
+             cleanLine.length > 3 && cleanLine.length < 50 &&
+             !cleanLine.match(/\d+/) && 
+             !cleanLine.match(/(REPS?|ROUNDS?|MINUTES?|SECONDS?)/)) {
+      sectionName = cleanLine.replace(/[:\s]*$/, '').trim();
+      sectionType = 'caps_header';
+      console.log(`🎯 Found caps header at line ${i}: "${sectionName}"`);
+    }
+    
+    if (sectionName && sectionType) {
+      sectionBoundaries.push({
+        index: i,
+        name: sectionName,
+        type: sectionType,
+        line: cleanLine
+      });
+    }
+  }
+
+  console.log(`📋 Found ${sectionBoundaries.length} section boundaries:`);
+  sectionBoundaries.forEach((boundary, idx) => {
+    console.log(`   ${idx + 1}. Line ${boundary.index}: "${boundary.name}" (${boundary.type})`);
+  });
+
+  // Step 2: Create entities from sections
+  console.log(`📋 Creating entities from ${sectionBoundaries.length} detected boundaries`);
+  
+  if (sectionBoundaries.length === 0) {
+    // No sections found, treat entire input as one entity
+    console.log('📋 No sections detected, creating single entity');
+    const cleanText = lines.slice(startIndex).join('\n').trim();
+    if (cleanText) {
+      entities.push({
+        rawText: cleanText,
+        detectedName: extractWorkoutName(cleanText) || 'Custom Workout',
+        sectionType: 'full_content'
+      });
+    }
+  } else {
+    // Handle multiple sections (including single section case)
+    for (let i = 0; i < sectionBoundaries.length; i++) {
+      const currentBoundary = sectionBoundaries[i];
+      const nextBoundary = sectionBoundaries[i + 1];
+      
+      console.log(`📝 Processing boundary ${i + 1}/${sectionBoundaries.length}: "${currentBoundary.name}" at line ${currentBoundary.index}`);
+      
+      // Handle content before first section (only for first boundary)
+      if (i === 0) {
+        const preContentLines = lines.slice(startIndex, currentBoundary.index);
+        const hasPreContent = preContentLines.some(line => line.trim() && !isDateLineEnhanced(line.trim()));
+        
+        if (hasPreContent) {
+          const preContent = preContentLines.join('\n').trim();
+          if (preContent) {
+            const preEntityName = extractWorkoutName(preContent) || 'Pre-Section Content';
+            entities.push({
+              rawText: preContent,
+              detectedName: preEntityName,
+              sectionType: 'pre_content'
+            });
+            console.log(`📝 ✅ Created pre-section entity: "${preEntityName}"`);
+          }
+        }
+      }
+      
+      // Create entity for current section
+      const endIndex = nextBoundary ? nextBoundary.index : lines.length;
+      const sectionLines = lines.slice(currentBoundary.index, endIndex);
+      const sectionContent = sectionLines.join('\n').trim();
+      
+      if (sectionContent) {
+        // Clean section content for better processing
+        const cleanedSectionContent = sectionLines
+          .filter(line => !isDateLineEnhanced(line.trim()))
+          .join('\n')
+          .trim();
+          
+        if (cleanedSectionContent) {
+          entities.push({
+            rawText: cleanedSectionContent,
+            detectedName: currentBoundary.name,
+            sectionType: currentBoundary.type
+          });
+          console.log(`📝 ✅ Created section entity: "${currentBoundary.name}"`);
+          console.log(`   Content preview: "${cleanedSectionContent.substring(0, 100)}..."`);
+        }
+      }
+    }
+  }
+
+  console.log(`✅ ENTITY SPLITTING COMPLETED: ${entities.length} entities created`);
+  entities.forEach((entity, index) => {
+    console.log(`   ${index + 1}. "${entity.detectedName}" (${entity.sectionType})`);
+    console.log(`      Content: "${entity.rawText.substring(0, 100)}..."`);
+  });
+
+  return entities;
+}
+
+function isDateLineEnhanced(line: string): boolean {
+  const datePatterns = [
+    /\d{1,2}[-\/]\w+[-\/]\d{4}/i,
+    /\w+\s+\d{1,2},?\s+\d{4}/i,
+    /(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i,
+    /\d{1,2}[-\/]\d{1,2}[-\/]\d{4}/,
+    /\*\d{2}-\w+-\d{4}\|\w+\*/,
+    /\d{1,2}-\w+-\d{4}\|\s*\w+/i
+  ];
+
+  return datePatterns.some(pattern => pattern.test(line));
+}
+
+function looksLikeWorkoutNameEnhanced(line: string, index: number, lines: string[]): boolean {
+  if (line.length > 50) return false;
+  if (/^\d/.test(line)) return false;
+  if (/(reps|rounds|for time|amrap|emom|minutes?|seconds?|build to|cap:)/i.test(line)) return false;
+
+  const isCapitalized = /^[A-Z]/.test(line);
+  const hasWorkoutContentBelow = index + 1 < lines.length && 
+    /(reps|rounds|for time|amrap|emom|\d+|build to)/i.test(lines[index + 1]);
+
+  const isWorkoutNamePattern = /^[A-Z][a-zA-Z\s]+$/.test(line) && line.length < 30;
+
+  return (isCapitalized && hasWorkoutContentBelow) || isWorkoutNamePattern;
+}
+
+async function identifyBenchmarkWorkoutEnhanced(input: string, girlWods: any[], heroWods: any[], notables: any[]) {
+  const inputLower = input.toLowerCase();
+
+  // Check Girl WODs first
+  for (const workout of girlWods) {
+    const nameMatch = calculateNameSimilarity(inputLower, workout.name.toLowerCase());
+    const descMatch = calculateDescriptionSimilarity(inputLower, workout.workoutDescription.toLowerCase());
+    
+    if (nameMatch > 0.8 || descMatch > 0.7) {
+      return {
+        found: true,
+        data: {
+          name: workout.name,
+          workoutDescription: workout.workoutDescription,
+          workoutType: workout.workoutType,
+          scoring: workout.scoring,
+          timeCap: workout.timeCap,
+          totalEffort: workout.totalEffort,
+          barbellLifts: workout.barbellLifts as string[] || [],
+          sourceTable: 'girl_wods',
+          databaseId: workout.id,
+          category: 'girls'
+        }
+      };
+    }
+  }
+
+  // Check Hero WODs
+  for (const workout of heroWods) {
+    const nameMatch = calculateNameSimilarity(inputLower, workout.name.toLowerCase());
+    const descMatch = calculateDescriptionSimilarity(inputLower, workout.workoutDescription.toLowerCase());
+    
+    if (nameMatch > 0.8 || descMatch > 0.7) {
+      return {
+        found: true,
+        data: {
+          name: workout.name,
+          workoutDescription: workout.workoutDescription,
+          workoutType: workout.workoutType,
+          scoring: workout.scoring,
+          timeCap: workout.timeCap,
+          totalEffort: workout.totalEffort,
+          barbellLifts: workout.barbellLifts as string[] || [],
+          sourceTable: 'hero_wods',
+          databaseId: workout.id,
+          category: 'heroes'
+        }
+      };
+    }
+  }
+
+  // Check Notables
+  for (const workout of notables) {
+    const nameMatch = calculateNameSimilarity(inputLower, workout.name.toLowerCase());
+    const descMatch = calculateDescriptionSimilarity(inputLower, workout.workoutDescription.toLowerCase());
+    
+    if (nameMatch > 0.8 || descMatch > 0.7) {
+      return {
+        found: true,
+        data: {
+          name: workout.name,
+          workoutDescription: workout.workoutDescription,
+          workoutType: workout.workoutType,
+          scoring: workout.scoring,
+          timeCap: workout.timeCap,
+          totalEffort: workout.totalEffort,
+          barbellLifts: workout.barbellLifts as string[] || [],
+          sourceTable: 'notables',
+          databaseId: workout.id,
+          category: 'notables'
+        }
+      };
+    }
+  }
+
+  return { found: false };
+}
+
+function calculateNameSimilarity(input: string, target: string): number {
+  if (input.includes(target) || target.includes(input)) {
+    return 0.9;
+  }
+  return levenshteinDistance(input, target) / Math.max(input.length, target.length);
+}
+
+function calculateDescriptionSimilarity(input: string, target: string): number {
+  const inputWords = input.split(/\s+/);
+  const targetWords = target.split(/\s+/);
+  
+  let matchCount = 0;
+  for (const word of inputWords) {
+    if (word.length > 2 && targetWords.some(tw => tw.includes(word) || word.includes(tw))) {
+      matchCount++;
+    }
+  }
+  
+  return matchCount / Math.max(inputWords.length, targetWords.length);
+}
+
+function parseAsCustomWorkoutEnhanced(entity: any, extractedDate?: string, barbellLifts?: any[]) {
+  const name = entity.detectedName && entity.detectedName !== 'Custom Workout' 
+    ? entity.detectedName 
+    : extractWorkoutName(entity.rawText);
+    
+  const workoutDescription = cleanWorkoutDescriptionEnhanced(entity.rawText);
+  const workoutType = detectWorkoutTypeEnhanced(entity.rawText.toLowerCase());
+  const scoring = workoutType === 'for_time' ? 'Time' : workoutType === 'amrap' ? 'Rounds + Reps' : 'Points';
+  const timeCap = extractTimeCap(entity.rawText);
+  const totalEffort = calculateTotalEffortEnhanced(entity.rawText);
+  const barbellLiftsFound = identifyBarbellLifts(entity.rawText, barbellLifts || []);
+
+  return {
+    name,
+    workoutDescription,
+    workoutType,
+    scoring,
+    timeCap,
+    totalEffort,
+    barbellLifts: barbellLiftsFound,
+    sourceTable: 'custom',
+    databaseId: null,
+    category: 'custom_user'
+  };
+}
+
+function cleanWorkoutDescriptionEnhanced(rawText: string): string {
+  const lines = rawText.split('\n');
+  const cleanedLines: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    if (i === 0 && (
+      /^(STRENGTH|CONDITIONING|METCON|SKILL|WARM-UP|COOL-DOWN)$/i.test(line) || 
+      /^(workout|wod)\s*:\s*/i.test(line) ||
+      /^[A-Z][A-Z\s&-]+:?$/.test(line)
+    )) {
+      continue;
+    }
+    
+    if (line) {
+      cleanedLines.push(line);
+    }
+  }
+  
+  return cleanedLines.join('\n').trim() || rawText.trim();
+}
+
+function detectWorkoutTypeEnhanced(cleanText: string): string {
+  if (cleanText.includes('for time') || cleanText.includes('rft')) return 'for_time';
+  if (cleanText.includes('amrap')) return 'amrap';
+  if (cleanText.includes('emom')) return 'emom';
+  if (cleanText.includes('tabata')) return 'tabata';
+  if (cleanText.includes('build to') || cleanText.includes('rm')) return 'strength';
+  if (cleanText.includes('max effort')) return 'strength';
+  
+  return 'for_time';
+}
+
+function calculateTotalEffortEnhanced(input: string): number {
+  let totalEffort = 0;
+  
+  const repMatches = input.match(/(\d+)\s*(?:reps?|x)/gi);
+  if (repMatches) {
+    repMatches.forEach(match => {
+      const num = parseInt(match.match(/\d+/)?.[0] || '0');
+      totalEffort += num;
+    });
+  }
+
+  const roundMatches = input.match(/(\d+)\s*rounds?/gi);
+  if (roundMatches) {
+    const rounds = parseInt(roundMatches[0].match(/\d+/)?.[0] || '1');
+    totalEffort *= rounds;
+  }
+
+  if (input.toLowerCase().includes('build to') || input.toLowerCase().includes('rm')) {
+    return 150;
+  }
+
+  return Math.max(totalEffort, 50);
 }
 
 // Helper functions for PRD parsing
@@ -952,90 +1303,104 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ==================== WORKOUT ROUTES ====================
 
-    // Parse Workout (PRD Algorithm - UNIFIED IMPLEMENTATION)
+    // Parse Workout (Multi-Entity Algorithm)
     if (method === 'POST' && pathname === '/api/workouts/parse') {
       const { rawText } = req.body;
       
       if (!rawText) {
         return res.status(400).json({ 
           success: false,
-          data: {
-            workout: null,
-            analysis: {
-              confidence: 0,
-              category: 'unknown',
-              categoryLabel: 'Unknown Workout',
-              errors: ["Workout text is required"]
-            },
-            suggestions: []
-          }
+          workoutFound: false,
+          workoutEntities: [],
+          confidence: 0,
+          errors: ["Workout text is required"]
         });
       }
 
       try {
         const token = getAuthToken(req);
         const userData = token ? verifyAuthToken(token) : null;
+        
+        // Use the enhanced multi-entity parsing function
         const result = await parseWorkout(rawText, userData?.id || 'anonymous-user');
         
-        if (result.workoutFound && result.workoutData) {
-          const workoutData = {
-            name: result.workoutData.name,
-            workoutDescription: result.workoutData.workoutDescription,
-            type: result.workoutData.workoutType,
-            scoring: result.workoutData.scoring,
-            timeCap: result.workoutData.timeCap,
-            totalEffort: result.workoutData.totalEffort,
-            barbellLifts: result.workoutData.barbellLifts,
-          };
-          
-          return res.status(200).json({
-            success: true,
-            data: {
-              workout: workoutData,
-              analysis: {
-                confidence: Math.round((result.confidence || 0) * 100),
-                category: result.matchedCategory,
-                categoryLabel: getCategoryLabel(result.matchedCategory),
-                sourceTable: result.workoutData.sourceTable,
-                databaseId: result.workoutData.databaseId
-              },
-              suggestions: result.suggestedWorkouts || []
-            }
-          });
-        } else {
-          return res.status(200).json({
-            success: false,
-            data: {
-              workout: null,
-              analysis: {
-                confidence: 0,
-                category: 'unknown',
-                categoryLabel: 'Unknown Workout',
-                errors: result.errors || ["No workout found"]
-              },
-              suggestions: result.suggestedWorkouts || []
-            }
-          });
+        if (result.workoutFound) {
+          // Handle new multi-entity response structure
+          if (result.workoutEntities && Array.isArray(result.workoutEntities)) {
+            const transformedEntities = result.workoutEntities.map((entity: any) => ({
+              name: entity.name,
+              workoutDescription: entity.workoutDescription,
+              type: entity.workoutType,
+              scoring: entity.scoring,
+              timeCap: entity.timeCap,
+              totalEffort: entity.totalEffort,
+              barbellLifts: entity.barbellLifts || [],
+              relatedBenchmark: entity.sourceTable !== 'custom' ? entity.name : entity.relatedBenchmark,
+              category: entity.category || 'custom_user',
+              sourceTable: entity.sourceTable,
+              databaseId: entity.databaseId
+            }));
+
+            return res.status(200).json({
+              success: true,
+              workoutFound: true,
+              workoutEntities: transformedEntities,
+              extractedDate: result.extractedDate || null,
+              confidence: Math.round(result.confidence * 100),
+              suggestedWorkouts: result.suggestedWorkouts || []
+            });
+          }
+          // Handle backward compatibility for single entity (workoutData)
+          else if (result.workoutData) {
+            const workoutEntity = {
+              name: result.workoutData.name,
+              workoutDescription: result.workoutData.workoutDescription,
+              type: result.workoutData.workoutType,
+              scoring: result.workoutData.scoring,
+              timeCap: result.workoutData.timeCap,
+              totalEffort: result.workoutData.totalEffort,
+              barbellLifts: result.workoutData.barbellLifts || [],
+              relatedBenchmark: result.workoutData.sourceTable !== 'custom' ? result.workoutData.name : null,
+              category: result.matchedCategory === 'girls' ? 'girls' : 
+                       result.matchedCategory === 'heroes' ? 'heroes' : 
+                       result.matchedCategory === 'notables' ? 'notables' : 'custom_user',
+              sourceTable: result.workoutData.sourceTable,
+              databaseId: result.workoutData.databaseId
+            };
+            
+            return res.status(200).json({
+              success: true,
+              workoutFound: true,
+              workoutEntities: [workoutEntity],
+              extractedDate: null,
+              confidence: Math.round(result.confidence * 100),
+              suggestedWorkouts: result.suggestedWorkouts || []
+            });
+          }
         }
+        
+        return res.status(200).json({
+          success: false,
+          workoutFound: false,
+          workoutEntities: [],
+          extractedDate: null,
+          confidence: 0,
+          errors: result.errors || ["No workout entities found"],
+          suggestedWorkouts: result.suggestedWorkouts || []
+        });
       } catch (error) {
-        console.error('Workout parsing error:', error);
+        console.error('Multi-entity workout parsing error:', error);
         return res.status(500).json({
           success: false,
-          data: {
-            workout: null,
-            analysis: {
-              confidence: 0,
-              category: 'unknown',
-              categoryLabel: 'Unknown Workout',
-              errors: ['Failed to parse workout: ' + (error as Error).message]
-            },
-            suggestions: []
-          }
+          workoutFound: false,
+          workoutEntities: [],
+          confidence: 0,
+          errors: ['Failed to parse workout: ' + (error as Error).message]
         });
       }
     }
 
-    // Create Workout
+    // Create Workout (Single or Multiple Entities)
     if (method === 'POST' && pathname === '/api/workouts') {
       const token = getAuthToken(req);
       if (!token) return res.status(401).json({ error: 'Authentication required' });
@@ -1046,18 +1411,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       try {
-        const workoutData = insertWorkoutSchema.parse({
-          ...req.body,
-          createdBy: userData.id
-        });
-        
-        const newWorkout = await db.insert(workouts).values(workoutData).returning();
-        return res.json(newWorkout[0]);
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        const { workoutEntities, ...singleWorkoutData } = req.body;
+
+        // Check if this is a multi-entity request (array of workout entities)
+        if (workoutEntities && Array.isArray(workoutEntities)) {
+          console.log(`Creating ${workoutEntities.length} workout entities`);
+          
+          const createdWorkouts: any[] = [];
+          
+          for (let i = 0; i < workoutEntities.length; i++) {
+            const entity = workoutEntities[i];
+            console.log(`Processing entity ${i + 1}: "${entity.name}"`);
+            
+            // Transform entity to match custom user workouts schema
+            const customWorkoutData = {
+              name: entity.name,
+              category: entity.type === 'strength' ? 'strength' : 'metcon',
+              workoutType: entity.type || entity.workoutType,
+              scoring: entity.scoring || (entity.type === 'for_time' ? 'Time' : entity.type === 'amrap' ? 'Rounds + Reps' : 'Points'),
+              timeCap: entity.timeCap,
+              workoutDescription: entity.workoutDescription || entity.description,
+              relatedBenchmark: entity.relatedBenchmark || null,
+              userId: userData.id
+            };
+            
+            const newWorkout = await db.insert(customUserWorkouts).values(customWorkoutData).returning();
+            createdWorkouts.push(newWorkout[0]);
+            console.log(`✅ Created custom workout: "${newWorkout[0].name}" (ID: ${newWorkout[0].id})`);
+          }
+          
+          return res.status(201).json({
+            success: true,
+            message: `Successfully created ${createdWorkouts.length} custom workouts`,
+            workouts: createdWorkouts,
+            count: createdWorkouts.length
+          });
+        } 
+        // Handle single workout creation (backward compatibility) - use custom_user_workouts
+        else {
+          console.log('Processing single workout creation');
+          
+          // Transform single workout to custom user workouts schema
+          const customWorkoutData = {
+            name: singleWorkoutData.name,
+            category: singleWorkoutData.type === 'strength' ? 'strength' : 'metcon',
+            workoutType: singleWorkoutData.type,
+            scoring: singleWorkoutData.scoring || (singleWorkoutData.type === 'for_time' ? 'Time' : singleWorkoutData.type === 'amrap' ? 'Rounds + Reps' : 'Points'),
+            timeCap: singleWorkoutData.timeCap,
+            workoutDescription: singleWorkoutData.description,
+            relatedBenchmark: singleWorkoutData.relatedBenchmark || null,
+            userId: userData.id
+          };
+          
+          const newWorkout = await db.insert(customUserWorkouts).values(customWorkoutData).returning();
+          console.log(`✅ Created single custom workout: "${newWorkout[0].name}" (ID: ${newWorkout[0].id})`);
+          
+          return res.status(201).json({
+            success: true,
+            message: 'Custom workout created successfully',
+            workout: newWorkout[0]
+          });
         }
-        return res.status(500).json({ message: "Failed to create workout" });
+      } catch (error) {
+        console.error('Create workout error:', error);
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({ 
+            success: false,
+            message: "Invalid input", 
+            errors: error.errors 
+          });
+        }
+        return res.status(500).json({ 
+          success: false,
+          message: "Failed to create workout(s)",
+          error: (error as Error).message 
+        });
       }
     }
 
@@ -1072,10 +1500,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       try {
-        const userWorkouts = await db.select().from(workouts)
-          .where(eq(workouts.createdBy, userData.id))
-          .orderBy(desc(workouts.createdAt));
-        return res.json(userWorkouts);
+        const userWorkouts = await db.select().from(customUserWorkouts)
+          .where(eq(customUserWorkouts.userId, userData.id))
+          .orderBy(desc(customUserWorkouts.createdAt));
+        
+        // Normalize field names for frontend compatibility
+        const normalizedWorkouts = userWorkouts.map(workout => ({
+          ...workout,
+          description: workout.workoutDescription, // Map workoutDescription to description
+          type: workout.workoutType, // Map workoutType to type
+          createdBy: workout.userId // Map userId to createdBy for compatibility
+        }));
+        
+        return res.json(normalizedWorkouts);
       } catch (error) {
         return res.status(500).json({ message: "Failed to fetch workouts" });
       }
@@ -1662,7 +2099,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Parse New Workout and Assign to Date
+    // Parse New Workout and Assign to Date (Multi-Entity Support)
     if (method === 'POST' && pathname === '/api/workouts/parse-and-assign') {
       const token = getAuthToken(req);
       if (!token) return res.status(401).json({ error: 'Authentication required' });
@@ -1673,61 +2110,81 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       try {
-        const { rawText, assignedDate } = req.body;
+        const { rawText, assignedDate, workoutEntities } = req.body;
         
-        if (!rawText || !assignedDate) {
-          return res.status(400).json({ error: 'rawText and assignedDate are required' });
+        if (!assignedDate) {
+          return res.status(400).json({ error: 'assignedDate is required' });
         }
 
-        let workoutData;
-        
-        // Check if rawText is JSON (edited workout) or plain text
-        try {
-          const parsedJson = JSON.parse(rawText);
-          if (parsedJson.name && parsedJson.workoutDescription) {
-            workoutData = parsedJson;
-          } else {
-            throw new Error('Invalid JSON format');
-          }
-        } catch {
-          // Parse the workout first if it's plain text
+        let entities: any[] = [];
+
+        // Handle multiple workout entities (from frontend)
+        if (workoutEntities && Array.isArray(workoutEntities)) {
+          entities = workoutEntities;
+        } else if (rawText) {
+          // Parse raw text using inline parsing function
           const parseResult = await parseWorkout(rawText, userData.id);
           
           if (!parseResult.workoutFound || !parseResult.workoutData) {
-            return res.status(400).json({ error: 'Failed to parse workout' });
+            return res.status(400).json({ 
+              error: 'Failed to parse workout',
+              details: parseResult.errors || ['No workout entities found']
+            });
           }
-          workoutData = parseResult.workoutData;
+          
+          // Convert single workout to entity format for consistency
+          const workoutEntity = {
+            name: parseResult.workoutData.name,
+            workoutType: parseResult.workoutData.workoutType,
+            scoring: parseResult.workoutData.scoring,
+            timeCap: parseResult.workoutData.timeCap,
+            workoutDescription: parseResult.workoutData.workoutDescription,
+            relatedBenchmark: parseResult.workoutData.sourceTable !== 'custom' ? parseResult.workoutData.name : null
+          };
+          
+          entities = [workoutEntity];
+        } else {
+          return res.status(400).json({ error: 'Either rawText or workoutEntities is required' });
         }
 
-        // Create custom user workout
-        const customWorkout = await db.insert(customUserWorkouts).values({
-          name: workoutData.name,
-          workoutType: workoutData.workoutType as any,
-          scoring: workoutData.scoring,
-          timeCap: workoutData.timeCap,
-          workoutDescription: workoutData.workoutDescription,
-          relatedBenchmark: workoutData.sourceTable !== 'custom' ? workoutData.name : null,
-          userId: userData.id
-        }).returning();
+        // Create custom user workouts for each entity and assign them
+        const createdWorkouts: any[] = [];
+        const assignments: any[] = [];
 
-        // Assign the created workout
-        const assignment = await db.insert(userWorkoutAssignments).values({
-          userId: userData.id,
-          workoutId: customWorkout[0].id,
-          workoutSource: 'custom_user',
-          assignedDate: assignedDate
-        }).returning();
+        for (const entity of entities) {
+          const customWorkout = await db.insert(customUserWorkouts).values({
+            name: entity.name,
+            workoutType: entity.workoutType as any,
+            scoring: entity.scoring,
+            timeCap: entity.timeCap,
+            workoutDescription: entity.workoutDescription,
+            relatedBenchmark: entity.relatedBenchmark,
+            userId: userData.id
+          }).returning();
+
+          // Assign each workout to the same date
+          const assignment = await db.insert(userWorkoutAssignments).values({
+            userId: userData.id,
+            workoutId: customWorkout[0].id,
+            workoutSource: 'custom_user',
+            assignedDate: assignedDate
+          }).returning();
+
+          createdWorkouts.push(customWorkout[0]);
+          assignments.push(assignment[0]);
+        }
 
         return res.json({
           success: true,
-          workout: customWorkout[0],
-          assignment: assignment[0],
-          message: 'Workout parsed, created, and assigned successfully'
+          workouts: createdWorkouts,
+          assignments: assignments,
+          count: createdWorkouts.length,
+          message: `${createdWorkouts.length} workout${createdWorkouts.length > 1 ? 's' : ''} parsed, created, and assigned successfully`
         });
       } catch (error) {
-        console.error('Error parsing and assigning workout:', error);
+        console.error('Error parsing and assigning workouts:', error);
         return res.status(500).json({ 
-          error: 'Failed to parse and assign workout',
+          error: 'Failed to parse and assign workouts',
           details: (error as Error).message 
         });
       }

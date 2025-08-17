@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,47 +10,47 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Clock, Target, Dumbbell, Edit3, Check } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Zap, Clock, Target, Dumbbell, Edit3, Check, Calendar, Trash2, Plus } from "lucide-react";
 
-interface ParsedWorkout {
+interface ParsedWorkoutEntity {
   name: string;
-  description: string;
+  workoutDescription: string;
   type: string;
   scoring?: string;
   timeCap?: number;
-  restBetweenIntervals?: number;
   totalEffort?: number;
   barbellLifts?: string[];
-  date?: string;
+  relatedBenchmark?: string;
+  category: 'girls' | 'heroes' | 'notables' | 'custom_community' | 'custom_user';
+  sourceTable?: string;
+  databaseId?: number;
 }
 
-interface PRDParseResult {
+interface MultiEntityParseResult {
   success: boolean;
-  data: {
-    workout?: ParsedWorkout;
-    analysis: {
-      confidence: number;
-      category: string;
-      categoryLabel: string;
-      sourceTable?: string;
-      databaseId?: number;
-      errors?: string[];
-    };
-    suggestions: string[];
-  };
+  workoutFound: boolean;
+  workoutEntities: ParsedWorkoutEntity[];
+  extractedDate?: string;
+  confidence: number;
+  suggestedWorkouts?: string[];
+  errors?: string[];
 }
 
 interface WorkoutParserProps {
-  onWorkoutCreated: (workout: any) => void;
+  onWorkoutsCreated?: (workouts: any[]) => void;
   communityId?: number;
 }
 
-export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserProps) {
+export function WorkoutParser({ onWorkoutsCreated, communityId }: WorkoutParserProps) {
   const [rawText, setRawText] = useState("");
-  const [parsedWorkout, setParsedWorkout] = useState<ParsedWorkout | null>(null);
+  const [parsedEntities, setParsedEntities] = useState<ParsedWorkoutEntity[]>([]);
+  const [extractedDate, setExtractedDate] = useState<string | undefined>();
   const [isEditing, setIsEditing] = useState(false);
-  const [parseResult, setParseResult] = useState<PRDParseResult | null>(null);
+  const [parseResult, setParseResult] = useState<MultiEntityParseResult | null>(null);
+  const [editingEntityIndex, setEditingEntityIndex] = useState<number | null>(null);
   const { toast } = useToast();
+  const { isAuthenticated, user } = useAuth();
 
   const workoutTypes = [
     { value: "for_time", label: "For Time" },
@@ -69,30 +70,34 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
       const response = await apiRequest("POST", "/api/workouts/parse", { rawText: text });
       return response.json();
     },
-    onSuccess: (data: PRDParseResult) => {
+    onSuccess: (data: MultiEntityParseResult) => {
       setParseResult(data);
 
-      if (data.success && data.data.workout) {
-        setParsedWorkout(data.data.workout);
+      if (data.success && data.workoutFound && data.workoutEntities.length > 0) {
+        setParsedEntities(data.workoutEntities);
+        setExtractedDate(data.extractedDate);
         setIsEditing(true);
         
-        const confidence = data.data.analysis.confidence;
-        const categoryLabel = data.data.analysis.categoryLabel;
+        const confidence = data.confidence;
+        const entityCount = data.workoutEntities.length;
         
         toast({
-          title: `🎯 Workout Parsed! (${confidence}% confidence)`,
-          description: `Identified as: ${categoryLabel}`,
+          title: `🎯 ${entityCount} Workout${entityCount > 1 ? 's' : ''} Parsed! (${confidence}% confidence)`,
+          description: entityCount > 1 
+            ? `Found ${entityCount} workout entities${data.extractedDate ? ` for ${data.extractedDate}` : ''}`
+            : `Single workout detected${data.extractedDate ? ` for ${data.extractedDate}` : ''}`,
         });
-      } else if (data.data.suggestions && data.data.suggestions.length > 0) {
+      } else if (data.suggestedWorkouts && data.suggestedWorkouts.length > 0) {
         toast({
           title: "🔍 No exact match found",
-          description: `Did you mean: ${data.data.suggestions.join(', ')}?`,
+          description: `Did you mean: ${data.suggestedWorkouts.join(', ')}?`,
           variant: "default",
         });
       } else {
         toast({
-          title: "❓ Custom Workout Detected",
-          description: "Parsed as custom workout - ready to save!",
+          title: "❓ Unable to parse workout",
+          description: data.errors?.join(', ') || "No workout entities could be identified",
+          variant: "destructive",
         });
       }
     },
@@ -106,25 +111,63 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
   });
 
   const createMutation = useMutation({
-    mutationFn: async (workoutData: any) => {
-      const response = await apiRequest("POST", "/api/workouts", workoutData);
-      return response.json();
+    mutationFn: async (entitiesData: ParsedWorkoutEntity[]) => {
+      try {
+        // Send all workout entities in a single request
+        const workoutEntitiesPayload = {
+          workoutEntities: entitiesData.map(entity => ({
+            name: entity.name,
+            workoutDescription: entity.workoutDescription,
+            type: entity.type,
+            scoring: entity.scoring,
+            timeCap: entity.timeCap,
+            totalEffort: entity.totalEffort,
+            barbellLifts: entity.barbellLifts,
+            relatedBenchmark: entity.relatedBenchmark
+          }))
+        };
+        
+        const response = await apiRequest("POST", "/api/workouts", workoutEntitiesPayload);
+        console.log('HTTP Status:', response.status);
+        
+        const result = await response.json();
+        console.log('API Response:', result);
+        
+        if (!result.success) {
+          console.error('API Error:', result.message);
+          throw new Error(result.message || 'Failed to create workouts');
+        }
+        
+        return result.workouts || [];
+      } catch (error) {
+        console.error('Mutation error:', error);
+        throw error;
+      }
     },
-    onSuccess: (data) => {
-      onWorkoutCreated(data);
+    onSuccess: (createdWorkouts) => {
+      // Safety check: only call onWorkoutsCreated if it's a function
+      if (typeof onWorkoutsCreated === 'function') {
+        onWorkoutsCreated(createdWorkouts);
+      }
+      
       setRawText("");
-      setParsedWorkout(null);
+      setParsedEntities([]);
+      setExtractedDate(undefined);
       setIsEditing(false);
       setParseResult(null);
+      setEditingEntityIndex(null);
+      console.log('Created workouts:', createdWorkouts);
+      
       toast({
-        title: "✅ Workout Created",
-        description: "Your workout has been created successfully.",
+        title: "✅ Workouts Created",
+        description: `${createdWorkouts.length} workout${createdWorkouts.length > 1 ? 's' : ''} created successfully.`,
       });
     },
     onError: (error) => {
+      console.log('Creation failed: ', error);
       toast({
         title: "💥 Creation Failed",
-        description: "Failed to create workout. Please try again.",
+        description: "Failed to create workouts. Please try again.",
         variant: "destructive",
       });
     }
@@ -142,31 +185,59 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
     parseMutation.mutate(rawText);
   };
 
-  const handleCreate = () => {
-    if (!parsedWorkout) return;
-
-    const workoutData = {
-      ...parsedWorkout,
-      communityId: communityId || null,
-      isPublic: false
-    };
-
-    createMutation.mutate(workoutData);
+  const handleCreateAll = () => {
+    if (parsedEntities.length === 0) return;
+    
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "🔐 Authentication Required",
+        description: "Please sign in to create workouts",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    createMutation.mutate(parsedEntities);
   };
 
-  const updateParsedWorkout = (field: string, value: any) => {
-    if (!parsedWorkout) return;
-    setParsedWorkout({
-      ...parsedWorkout,
+  const updateEntity = (index: number, field: string, value: any) => {
+    const updated = [...parsedEntities];
+    updated[index] = {
+      ...updated[index],
       [field]: value
-    });
+    };
+    setParsedEntities(updated);
+  };
+
+  const removeEntity = (index: number) => {
+    const updated = parsedEntities.filter((_, i) => i !== index);
+    setParsedEntities(updated);
+    
+    if (editingEntityIndex === index) {
+      setEditingEntityIndex(null);
+    } else if (editingEntityIndex !== null && editingEntityIndex > index) {
+      setEditingEntityIndex(editingEntityIndex - 1);
+    }
   };
 
   const clearAll = () => {
     setRawText("");
-    setParsedWorkout(null);
+    setParsedEntities([]);
+    setExtractedDate(undefined);
     setIsEditing(false);
     setParseResult(null);
+    setEditingEntityIndex(null);
+  };
+
+  const getCategoryLabel = (category: string) => {
+    const labels: Record<string, string> = {
+      'girls': '💪 Girl WOD',
+      'heroes': '🎖️ Hero WOD',
+      'notables': '⭐ Notable WOD',
+      'custom_community': '🏘️ Community WOD',
+      'custom_user': '👤 User WOD'
+    };
+    return labels[category] || '🔧 Custom Workout';
   };
 
   return (
@@ -176,7 +247,7 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
         <CardHeader>
           <CardTitle className="flex items-center">
             <Zap className="h-5 w-5 mr-2 text-primary" />
-            Smart Workout Parser
+            Multi-Entity Workout Parser
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -188,23 +259,28 @@ export function WorkoutParser({ onWorkoutCreated, communityId }: WorkoutParserPr
 
 27-June-2025 | Friday
 
+STRENGTH:
+Back Squat
+5 x 3 @ 85%
+
+CONDITIONING:
 Fran
 21-15-9 reps for time of:
-Thrusters (95/65 lb)
-Pull-ups
-
+- Thrusters (95/65 lb)
+- Pull-ups
 Time cap: 8 minutes
 
--- or --
-
-AMRAP 20 minutes:
-10 Burpees
-15 Kettlebell Swings (53/35)
-20 Air Squats"
+COOL DOWN:
+500m Row
+2 rounds of:
+10 Stretch holds"
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              className="min-h-[150px]"
+              className="min-h-[200px]"
             />
+            <div className="text-sm text-muted-foreground mt-2">
+              💡 The parser can automatically detect multiple workout sections, dates, and benchmark workouts
+            </div>
           </div>
           
           <div className="flex gap-2">
@@ -215,12 +291,12 @@ AMRAP 20 minutes:
               {parseMutation.isPending ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Analyzing...
+                  Parsing Multiple Entities...
                 </>
               ) : (
                 <>
                   <Zap className="h-4 w-4 mr-2" />
-                  Parse Workout
+                  Parse Workout(s)
                 </>
               )}
             </Button>
@@ -235,40 +311,41 @@ AMRAP 20 minutes:
         </CardContent>
       </Card>
 
-      {/* PRD Analysis Results */}
+      {/* Parse Results Summary */}
       {parseResult && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <Target className="h-5 w-5 mr-2 text-accent" />
-              📊 Analysis Results
+              📊 Parse Results
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <Badge variant={parseResult.data.analysis.confidence > 80 ? "default" : "secondary"}>
-                    {parseResult.data.analysis.confidence}% Confidence
+                  <Badge variant={parseResult.confidence > 80 ? "default" : "secondary"}>
+                    {parseResult.confidence}% Confidence
                   </Badge>
                   
                   <Badge variant="outline">
-                    {parseResult.data.analysis.categoryLabel}
+                    {parseResult.workoutEntities.length} Entities Found
                   </Badge>
 
-                  {parseResult.data.analysis.sourceTable && (
-                    <Badge variant="secondary" className="text-xs">
-                      Source: {parseResult.data.analysis.sourceTable}
+                  {extractedDate && (
+                    <Badge variant="secondary">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {extractedDate}
                     </Badge>
                   )}
                 </div>
               </div>
 
-              {parseResult.data.suggestions && parseResult.data.suggestions.length > 0 && (
+              {parseResult.suggestedWorkouts && parseResult.suggestedWorkouts.length > 0 && (
                 <div>
-                  <Label className="text-sm font-medium text-muted-foreground">Smart Suggestions</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Workout Suggestions</Label>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {parseResult.data.suggestions.map((suggestion, index) => (
+                    {parseResult.suggestedWorkouts.map((suggestion: string, index: number) => (
                       <Button
                         key={index}
                         variant="outline"
@@ -283,11 +360,11 @@ AMRAP 20 minutes:
                 </div>
               )}
 
-              {parseResult.data.analysis.errors && parseResult.data.analysis.errors.length > 0 && (
+              {parseResult.errors && parseResult.errors.length > 0 && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                   <Label className="text-sm font-medium text-red-800">Parsing Issues</Label>
                   <ul className="mt-1 text-sm text-red-700 list-inside list-disc">
-                    {parseResult.data.analysis.errors.map((error, index) => (
+                    {parseResult.errors.map((error: string, index: number) => (
                       <li key={index}>{error}</li>
                     ))}
                   </ul>
@@ -298,160 +375,185 @@ AMRAP 20 minutes:
         </Card>
       )}
 
-      {/* Parsed Workout Section */}
-      {parsedWorkout && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center">
-                <Edit3 className="h-5 w-5 mr-2 text-accent" />
-                Parsed Workout
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditing(!isEditing)}
-              >
-                {isEditing ? "Preview" : "Edit"}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isEditing ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Workout Name</Label>
-                  <Input
-                    id="name"
-                    value={parsedWorkout.name}
-                    onChange={(e) => updateParsedWorkout("name", e.target.value)}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="type">Workout Type</Label>
-                  <Select
-                    value={parsedWorkout.type}
-                    onValueChange={(value) => updateParsedWorkout("type", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workoutTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="timeCap">Time Cap (minutes)</Label>
-                  <Input
-                    id="timeCap"
-                    type="number"
-                    value={parsedWorkout.timeCap ? parsedWorkout.timeCap / 60 : ""}
-                    onChange={(e) => updateParsedWorkout("timeCap", e.target.value ? parseInt(e.target.value) * 60 : null)}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="totalEffort">Total Effort</Label>
-                  <Input
-                    id="totalEffort"
-                    type="number"
-                    value={parsedWorkout.totalEffort || ""}
-                    onChange={(e) => updateParsedWorkout("totalEffort", e.target.value ? parseInt(e.target.value) : null)}
-                  />
-                </div>
-                
-                <div className="md:col-span-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={parsedWorkout.description}
-                    onChange={(e) => updateParsedWorkout("description", e.target.value)}
-                    rows={4}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">{parsedWorkout.name}</h3>
+      {/* Parsed Entities Section */}
+      {parsedEntities.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">
+              Parsed Workout Entities ({parsedEntities.length})
+            </h3>
+            <Button
+              onClick={handleCreateAll}
+              disabled={createMutation.isPending || parsedEntities.length === 0}
+            >
+              {createMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Create All {parsedEntities.length} Workout{parsedEntities.length > 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </div>
+
+          {parsedEntities.map((entity, index) => (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center">
+                    <span className="text-sm bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center mr-3">
+                      {index + 1}
+                    </span>
+                    <span>{entity.name}</span>
+                    <Badge variant="outline" className="ml-2">
+                      {getCategoryLabel(entity.category)}
+                    </Badge>
+                  </span>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{parsedWorkout.type.replace("_", " ").toUpperCase()}</Badge>
-                    {parsedWorkout.scoring && (
-                      <Badge variant="secondary">{parsedWorkout.scoring}</Badge>
-                    )}
-                    {parsedWorkout.timeCap && (
-                      <Badge variant="secondary">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {Math.round(parsedWorkout.timeCap / 60)}min
-                      </Badge>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingEntityIndex(editingEntityIndex === index ? null : index)}
+                    >
+                      <Edit3 className="h-4 w-4 mr-1" />
+                      {editingEntityIndex === index ? "Preview" : "Edit"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeEntity(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-                
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <pre className="whitespace-pre-wrap text-sm">{parsedWorkout.description}</pre>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {parsedWorkout.totalEffort && (
-                    <div className="flex items-center">
-                      <Target className="h-4 w-4 mr-2 text-accent" />
-                      <span className="text-sm">Total Effort: {parsedWorkout.totalEffort}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {editingEntityIndex === index ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`name-${index}`}>Workout Name</Label>
+                      <Input
+                        id={`name-${index}`}
+                        value={entity.name}
+                        onChange={(e) => updateEntity(index, "name", e.target.value)}
+                      />
                     </div>
-                  )}
-                  
-                  
-                  {parsedWorkout.barbellLifts && parsedWorkout.barbellLifts.length > 0 && (
-                    <div className="flex items-center">
-                      <Dumbbell className="h-4 w-4 mr-2 text-primary" />
-                      <span className="text-sm">{parsedWorkout.barbellLifts.length} lift(s)</span>
+                    
+                    <div>
+                      <Label htmlFor={`type-${index}`}>Workout Type</Label>
+                      <Select
+                        value={entity.type}
+                        onValueChange={(value) => updateEntity(index, "type", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {workoutTypes.map((type) => (
+                            <SelectItem key={type.value} value={type.value}>
+                              {type.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                </div>
-                
-                {parsedWorkout.barbellLifts && parsedWorkout.barbellLifts.length > 0 && (
-                  <div>
-                    <Label>Barbell Lifts</Label>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {parsedWorkout.barbellLifts.map((lift, index) => (
-                        <Badge key={index} variant="secondary">
-                          <Dumbbell className="h-3 w-3 mr-1" />
-                          {lift}
-                        </Badge>
-                      ))}
+                    
+                    <div>
+                      <Label htmlFor={`timeCap-${index}`}>Time Cap (minutes)</Label>
+                      <Input
+                        id={`timeCap-${index}`}
+                        type="number"
+                        value={entity.timeCap ? entity.timeCap / 60 : ""}
+                        onChange={(e) => updateEntity(index, "timeCap", e.target.value ? parseInt(e.target.value) * 60 : null)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor={`totalEffort-${index}`}>Total Effort</Label>
+                      <Input
+                        id={`totalEffort-${index}`}
+                        type="number"
+                        value={entity.totalEffort || ""}
+                        onChange={(e) => updateEntity(index, "totalEffort", e.target.value ? parseInt(e.target.value) : null)}
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <Label htmlFor={`description-${index}`}>Description</Label>
+                      <Textarea
+                        id={`description-${index}`}
+                        value={entity.workoutDescription}
+                        onChange={(e) => updateEntity(index, "workoutDescription", e.target.value)}
+                        rows={4}
+                      />
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-            
-            <div className="flex justify-end">
-              <Button
-                onClick={handleCreate}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Creating...
-                  </>
                 ) : (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Create Workout
-                  </>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{entity.type.replace("_", " ").toUpperCase()}</Badge>
+                        {entity.scoring && (
+                          <Badge variant="secondary">{entity.scoring}</Badge>
+                        )}
+                        {entity.timeCap && (
+                          <Badge variant="secondary">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {Math.round(entity.timeCap / 60)}min
+                          </Badge>
+                        )}
+                        {entity.relatedBenchmark && (
+                          <Badge variant="outline">
+                            Related: {entity.relatedBenchmark}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <pre className="whitespace-pre-wrap text-sm">{entity.workoutDescription}</pre>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {entity.totalEffort && (
+                        <div className="flex items-center">
+                          <Target className="h-4 w-4 mr-2 text-accent" />
+                          <span className="text-sm">Total Effort: {entity.totalEffort}</span>
+                        </div>
+                      )}
+                      
+                      {entity.barbellLifts && entity.barbellLifts.length > 0 && (
+                        <div className="flex items-center">
+                          <Dumbbell className="h-4 w-4 mr-2 text-primary" />
+                          <span className="text-sm">{entity.barbellLifts.length} lift(s)</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {entity.barbellLifts && entity.barbellLifts.length > 0 && (
+                      <div>
+                        <Label>Barbell Lifts</Label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {entity.barbellLifts.map((lift: string, liftIndex: number) => (
+                            <Badge key={liftIndex} variant="secondary">
+                              <Dumbbell className="h-3 w-3 mr-1" />
+                              {lift}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );
