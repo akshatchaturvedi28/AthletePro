@@ -75,6 +75,7 @@ const workouts = pgTable("workouts", {
   type: workoutTypeEnum("type").notNull(),
   timeCap: integer("time_cap"),
   totalEffort: integer("total_effort"),
+  barbellLifts: jsonb("barbell_lifts"),
   createdBy: varchar("created_by"),
   communityId: integer("community_id"),
   isPublic: boolean("is_public").default(false),
@@ -113,7 +114,7 @@ const girlWods = pgTable("girl_wods", {
   scoring: varchar("scoring", { length: 100 }).notNull(),
   timeCap: integer("time_cap"),
   totalEffort: integer("total_effort"),
-  createdAt: timestamp("created_at").defaultNow(),
+  barbellLifts: jsonb("barbell_lifts"),
 });
 
 const heroWods = pgTable("hero_wods", {
@@ -124,7 +125,7 @@ const heroWods = pgTable("hero_wods", {
   scoring: varchar("scoring", { length: 100 }).notNull(),
   timeCap: integer("time_cap"),
   totalEffort: integer("total_effort"),
-  createdAt: timestamp("created_at").defaultNow(),
+  barbellLifts: jsonb("barbell_lifts"),
 });
 
 const notables = pgTable("notables", {
@@ -135,7 +136,7 @@ const notables = pgTable("notables", {
   scoring: varchar("scoring", { length: 100 }).notNull(),
   timeCap: integer("time_cap"),
   totalEffort: integer("total_effort"),
-  createdAt: timestamp("created_at").defaultNow(),
+  barbellLifts: jsonb("barbell_lifts"),
 });
 
 const barbellLifts = pgTable("barbell_lifts", {
@@ -143,16 +144,6 @@ const barbellLifts = pgTable("barbell_lifts", {
   liftName: varchar("lift_name", { length: 100 }).notNull().unique(),
   category: varchar("category", { length: 50 }).notNull(),
   liftType: varchar("lift_type", { length: 50 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Junction table for workout-barbell lift relationships
-const workoutBarbellLifts = pgTable("workout_barbell_lifts", {
-  id: serial("id").primaryKey(),
-  workoutId: integer("workout_id").notNull(),
-  barbellLiftId: integer("barbell_lift_id").notNull(),
-  sourceType: varchar("source_type", { length: 50 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Workout source enum for assignments
@@ -219,6 +210,7 @@ const insertWorkoutSchema = z.object({
   type: z.enum(["for_time", "amrap", "emom", "tabata", "strength", "interval", "endurance", "chipper", "ladder", "unbroken"]),
   timeCap: z.number().nullable().optional(),
   totalEffort: z.number().nullable().optional(),
+  barbellLifts: z.array(z.string()).optional(),
   createdBy: z.string(),
   communityId: z.number().nullable().optional(),
   isPublic: z.boolean().optional(),
@@ -337,39 +329,9 @@ async function parseWorkout(rawText: string, userId: string) {
     console.log('🚀 Starting Enhanced Multi-Entity Workout Parsing...');
     
     // Load workout database tables
-    const girlWodsList = await db.select({
-      id: girlWods.id,
-      name: girlWods.name,
-      workoutDescription: girlWods.workoutDescription,
-      workoutType: girlWods.workoutType,
-      scoring: girlWods.scoring,
-      timeCap: girlWods.timeCap,
-      totalEffort: girlWods.totalEffort,
-      createdAt: girlWods.createdAt
-    }).from(girlWods);
-    
-    const heroWodsList = await db.select({
-      id: heroWods.id,
-      name: heroWods.name,
-      workoutDescription: heroWods.workoutDescription,
-      workoutType: heroWods.workoutType,
-      scoring: heroWods.scoring,
-      timeCap: heroWods.timeCap,
-      totalEffort: heroWods.totalEffort,
-      createdAt: heroWods.createdAt
-    }).from(heroWods);
-    
-    const notablesList = await db.select({
-      id: notables.id,
-      name: notables.name,
-      workoutDescription: notables.workoutDescription,
-      workoutType: notables.workoutType,
-      scoring: notables.scoring,
-      timeCap: notables.timeCap,
-      totalEffort: notables.totalEffort,
-      createdAt: notables.createdAt
-    }).from(notables);
-    
+    const girlWodsList = await db.select().from(girlWods);
+    const heroWodsList = await db.select().from(heroWods);
+    const notablesList = await db.select().from(notables);
     const barbellLiftsList = await db.select().from(barbellLifts);
 
     // Step 1: Enhanced Input Preprocessing
@@ -662,17 +624,6 @@ async function identifyBenchmarkWorkoutEnhanced(input: string, girlWods: any[], 
     const descMatch = calculateDescriptionSimilarity(inputLower, workout.workoutDescription.toLowerCase());
     
     if (nameMatch > 0.8 || descMatch > 0.7) {
-      // Get barbell lifts from junction table
-      const workoutLifts = await db.select({
-        liftName: barbellLifts.liftName
-      })
-      .from(workoutBarbellLifts)
-      .innerJoin(barbellLifts, eq(workoutBarbellLifts.barbellLiftId, barbellLifts.id))
-      .where(and(
-        eq(workoutBarbellLifts.workoutId, workout.id),
-        eq(workoutBarbellLifts.sourceType, 'girl_wods')
-      ));
-
       return {
         found: true,
         data: {
@@ -682,7 +633,7 @@ async function identifyBenchmarkWorkoutEnhanced(input: string, girlWods: any[], 
           scoring: workout.scoring,
           timeCap: workout.timeCap,
           totalEffort: workout.totalEffort,
-          barbellLifts: workoutLifts.map(lift => lift.liftName),
+          barbellLifts: workout.barbellLifts as string[] || [],
           sourceTable: 'girl_wods',
           databaseId: workout.id,
           category: 'girls'
@@ -697,17 +648,6 @@ async function identifyBenchmarkWorkoutEnhanced(input: string, girlWods: any[], 
     const descMatch = calculateDescriptionSimilarity(inputLower, workout.workoutDescription.toLowerCase());
     
     if (nameMatch > 0.8 || descMatch > 0.7) {
-      // Get barbell lifts from junction table
-      const workoutLifts = await db.select({
-        liftName: barbellLifts.liftName
-      })
-      .from(workoutBarbellLifts)
-      .innerJoin(barbellLifts, eq(workoutBarbellLifts.barbellLiftId, barbellLifts.id))
-      .where(and(
-        eq(workoutBarbellLifts.workoutId, workout.id),
-        eq(workoutBarbellLifts.sourceType, 'hero_wods')
-      ));
-
       return {
         found: true,
         data: {
@@ -717,7 +657,7 @@ async function identifyBenchmarkWorkoutEnhanced(input: string, girlWods: any[], 
           scoring: workout.scoring,
           timeCap: workout.timeCap,
           totalEffort: workout.totalEffort,
-          barbellLifts: workoutLifts.map(lift => lift.liftName),
+          barbellLifts: workout.barbellLifts as string[] || [],
           sourceTable: 'hero_wods',
           databaseId: workout.id,
           category: 'heroes'
@@ -732,17 +672,6 @@ async function identifyBenchmarkWorkoutEnhanced(input: string, girlWods: any[], 
     const descMatch = calculateDescriptionSimilarity(inputLower, workout.workoutDescription.toLowerCase());
     
     if (nameMatch > 0.8 || descMatch > 0.7) {
-      // Get barbell lifts from junction table
-      const workoutLifts = await db.select({
-        liftName: barbellLifts.liftName
-      })
-      .from(workoutBarbellLifts)
-      .innerJoin(barbellLifts, eq(workoutBarbellLifts.barbellLiftId, barbellLifts.id))
-      .where(and(
-        eq(workoutBarbellLifts.workoutId, workout.id),
-        eq(workoutBarbellLifts.sourceType, 'notables')
-      ));
-
       return {
         found: true,
         data: {
@@ -752,7 +681,7 @@ async function identifyBenchmarkWorkoutEnhanced(input: string, girlWods: any[], 
           scoring: workout.scoring,
           timeCap: workout.timeCap,
           totalEffort: workout.totalEffort,
-          barbellLifts: workoutLifts.map(lift => lift.liftName),
+          barbellLifts: workout.barbellLifts as string[] || [],
           sourceTable: 'notables',
           databaseId: workout.id,
           category: 'notables'
@@ -1405,7 +1334,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               scoring: entity.scoring,
               timeCap: entity.timeCap,
               totalEffort: entity.totalEffort,
-              barbellLifts: Array.isArray(entity.barbellLifts) ? entity.barbellLifts : [],
+              barbellLifts: entity.barbellLifts || [],
               relatedBenchmark: entity.sourceTable !== 'custom' ? entity.name : entity.relatedBenchmark,
               category: entity.category || 'custom_user',
               sourceTable: entity.sourceTable,
@@ -1418,8 +1347,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               workoutEntities: transformedEntities,
               extractedDate: result.extractedDate || null,
               confidence: Math.round(result.confidence * 100),
-              suggestedWorkouts: result.suggestedWorkouts || [],
-              allBarbellLifts: await db.select().from(barbellLifts) // Include all available lifts for frontend dropdown
+              suggestedWorkouts: result.suggestedWorkouts || []
             });
           }
           // Handle backward compatibility for single entity (workoutData)

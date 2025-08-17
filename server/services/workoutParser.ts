@@ -50,7 +50,7 @@ export interface ParsedWorkoutData {
   timeCap?: number;
   workoutDescription: string;
   totalEffort: number;
-  barbellLifts: Array<{ id: number; liftName: string; category: string; liftType: string }>;
+  barbellLifts: string[];
   relatedBenchmark?: string;
   category: 'girls' | 'heroes' | 'notables' | 'custom_community' | 'custom_user';
   sourceTable?: string;
@@ -727,19 +727,14 @@ export class WorkoutParser {
   /**
    * Helper: Identify barbell lifts using database - Enhanced
    */
-  private static identifyBarbellLifts(input: string): Array<{ id: number; liftName: string; category: string; liftType: string }> {
+  private static identifyBarbellLifts(input: string): string[] {
     const inputLower = input.toLowerCase();
-    const foundLifts: Array<{ id: number; liftName: string; category: string; liftType: string }> = [];
+    const foundLifts: string[] = [];
     
     for (const lift of this.barbellLiftsCache) {
       const liftName = lift.liftName.toLowerCase();
       if (inputLower.includes(liftName)) {
-        foundLifts.push({
-          id: lift.id,
-          liftName: lift.liftName,
-          category: lift.category,
-          liftType: lift.liftType
-        });
+        foundLifts.push(lift.liftName);
       }
     }
     
@@ -778,7 +773,7 @@ export class WorkoutParser {
       timeCap: girlWod.timeCap || undefined,
       workoutDescription: girlWod.workoutDescription,
       totalEffort: girlWod.totalEffort,
-      barbellLifts: [], // Will be populated from junction table
+      barbellLifts: (girlWod.barbellLifts as string[]) || [],
       category: 'girls',
       sourceTable: 'girl_wods',
       databaseId: girlWod.id
@@ -793,7 +788,7 @@ export class WorkoutParser {
       timeCap: heroWod.timeCap || undefined,
       workoutDescription: heroWod.workoutDescription,
       totalEffort: heroWod.totalEffort,
-      barbellLifts: [], // Will be populated from junction table
+      barbellLifts: (heroWod.barbellLifts as string[]) || [],
       category: 'heroes',
       sourceTable: 'hero_wods',
       databaseId: heroWod.id
@@ -808,7 +803,7 @@ export class WorkoutParser {
       timeCap: notable.timeCap || undefined,
       workoutDescription: notable.workoutDescription,
       totalEffort: notable.totalEffort || 100,
-      barbellLifts: [], // Will be populated from junction table
+      barbellLifts: (notable.barbellLifts as string[]) || [],
       category: 'notables',
       sourceTable: 'notables',
       databaseId: notable.id
