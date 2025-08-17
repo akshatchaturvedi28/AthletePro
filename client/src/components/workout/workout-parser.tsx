@@ -13,6 +13,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Zap, Clock, Target, Dumbbell, Edit3, Check, Calendar, Trash2, Plus } from "lucide-react";
 
+interface BarbellLift {
+  id: number;
+  liftName: string;
+  category: string;
+  liftType: string;
+}
+
 interface ParsedWorkoutEntity {
   name: string;
   workoutDescription: string;
@@ -20,7 +27,7 @@ interface ParsedWorkoutEntity {
   scoring?: string;
   timeCap?: number;
   totalEffort?: number;
-  barbellLifts?: string[];
+  barbellLifts?: BarbellLift[];
   relatedBenchmark?: string;
   category: 'girls' | 'heroes' | 'notables' | 'custom_community' | 'custom_user';
   sourceTable?: string;
@@ -35,6 +42,7 @@ interface MultiEntityParseResult {
   confidence: number;
   suggestedWorkouts?: string[];
   errors?: string[];
+  allBarbellLifts?: BarbellLift[];
 }
 
 interface WorkoutParserProps {
@@ -218,6 +226,36 @@ export function WorkoutParser({ onWorkoutsCreated, communityId }: WorkoutParserP
     } else if (editingEntityIndex !== null && editingEntityIndex > index) {
       setEditingEntityIndex(editingEntityIndex - 1);
     }
+  };
+
+  const addBarbellLift = (entityIndex: number, liftId: string) => {
+    const availableLifts = parseResult?.allBarbellLifts || [];
+    const selectedLift = availableLifts.find(lift => lift.id.toString() === liftId);
+    
+    if (selectedLift) {
+      const updated = [...parsedEntities];
+      const currentLifts = updated[entityIndex].barbellLifts || [];
+      
+      // Check if lift is already added
+      if (!currentLifts.some(lift => lift.id === selectedLift.id)) {
+        updated[entityIndex] = {
+          ...updated[entityIndex],
+          barbellLifts: [...currentLifts, selectedLift]
+        };
+        setParsedEntities(updated);
+      }
+    }
+  };
+
+  const removeBarbellLift = (entityIndex: number, liftId: number) => {
+    const updated = [...parsedEntities];
+    const currentLifts = updated[entityIndex].barbellLifts || [];
+    
+    updated[entityIndex] = {
+      ...updated[entityIndex],
+      barbellLifts: currentLifts.filter(lift => lift.id !== liftId)
+    };
+    setParsedEntities(updated);
   };
 
   const clearAll = () => {
@@ -492,6 +530,63 @@ COOL DOWN:
                         rows={4}
                       />
                     </div>
+                    
+                    <div className="md:col-span-2">
+                      <Label>Barbell Lifts</Label>
+                      <div className="space-y-3">
+                        {/* Current Barbell Lifts */}
+                        {entity.barbellLifts && entity.barbellLifts.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {entity.barbellLifts.map((lift: BarbellLift, liftIndex: number) => (
+                              <Badge key={liftIndex} variant="secondary" className="flex items-center gap-1">
+                                <Dumbbell className="h-3 w-3" />
+                                {lift.liftName}
+                                <span className="text-xs text-muted-foreground">
+                                  ({lift.category})
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground ml-1"
+                                  onClick={() => removeBarbellLift(index, lift.id)}
+                                >
+                                  ×
+                                </Button>
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Add New Barbell Lift */}
+                        {parseResult?.allBarbellLifts && parseResult.allBarbellLifts.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Select onValueChange={(value) => addBarbellLift(index, value)}>
+                              <SelectTrigger className="w-64">
+                                <SelectValue placeholder="Add barbell lift..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {parseResult.allBarbellLifts
+                                  .filter(lift => !entity.barbellLifts?.some(existing => existing.id === lift.id))
+                                  .map((lift) => (
+                                    <SelectItem key={lift.id} value={lift.id.toString()}>
+                                      <div className="flex items-center gap-2">
+                                        <Dumbbell className="h-3 w-3" />
+                                        <span>{lift.liftName}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          ({lift.category})
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="text-xs text-muted-foreground">
+                              Select lifts present in this workout
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -539,10 +634,13 @@ COOL DOWN:
                       <div>
                         <Label>Barbell Lifts</Label>
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {entity.barbellLifts.map((lift: string, liftIndex: number) => (
+                          {entity.barbellLifts.map((lift: BarbellLift, liftIndex: number) => (
                             <Badge key={liftIndex} variant="secondary">
                               <Dumbbell className="h-3 w-3 mr-1" />
-                              {lift}
+                              {lift.liftName}
+                              <span className="text-xs text-muted-foreground ml-1">
+                                ({lift.category})
+                              </span>
                             </Badge>
                           ))}
                         </div>
