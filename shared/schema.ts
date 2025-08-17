@@ -185,6 +185,18 @@ export const workoutSourceEnum = pgEnum("workout_source", [
   "notable"
 ]);
 
+// Junction table for workout-barbell lift relationships
+export const workoutBarbellLifts = pgTable("workout_barbell_lifts", {
+  id: serial("id").primaryKey(),
+  workoutId: integer("workout_id").notNull(),
+  barbellLiftId: integer("barbell_lift_id").notNull().references(() => barbellLifts.id),
+  sourceType: varchar("source_type", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("workout_barbell_lifts_workout_idx").on(table.workoutId, table.sourceType),
+  index("workout_barbell_lifts_lift_idx").on(table.barbellLiftId),
+]);
+
 // Workouts table
 export const workouts = pgTable("workouts", {
   id: serial("id").primaryKey(),
@@ -195,7 +207,6 @@ export const workouts = pgTable("workouts", {
   restBetweenIntervals: integer("rest_between_intervals"), // in seconds
   totalEffort: integer("total_effort"), // calculated value
   relatedBenchmark: varchar("related_benchmark", { length: 255 }),
-  barbellLifts: jsonb("barbell_lifts"), // array of lift names
   createdBy: varchar("created_by").references(() => users.id),
   communityId: integer("community_id").references(() => communities.id),
   isPublic: boolean("is_public").default(false),
@@ -240,7 +251,6 @@ export const girlWods = pgTable("girl_wods", {
   timeCap: integer("time_cap"), // in seconds
   workoutDescription: text("workout_description").notNull(),
   totalEffort: integer("total_effort").notNull(),
-  barbellLifts: jsonb("barbell_lifts"), // array of lift names
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -254,7 +264,6 @@ export const heroWods = pgTable("hero_wods", {
   timeCap: integer("time_cap"), // in seconds
   workoutDescription: text("workout_description").notNull(),
   totalEffort: integer("total_effort").notNull(),
-  barbellLifts: jsonb("barbell_lifts"), // array of lift names
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -268,7 +277,6 @@ export const notables = pgTable("notables", {
   timeCap: integer("time_cap"), // in seconds
   workoutDescription: text("workout_description").notNull(),
   totalEffort: integer("total_effort"),
-  barbellLifts: jsonb("barbell_lifts"), // array of lift names
   createdAt: timestamp("created_at").defaultNow(),
 });
 
