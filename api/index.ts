@@ -155,6 +155,21 @@ const workoutBarbellLifts = pgTable("workout_barbell_lifts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Barbell Lifts Progress table for tracking user's 1RM-5RM progress
+const barbellLiftsProgress = pgTable("barbell_lifts_progress", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  barbellLiftId: integer("barbell_lift_id").notNull(),
+  liftName: varchar("lift_name", { length: 100 }).notNull(),
+  oneRm: jsonb("one_rm").default({}),
+  twoRm: jsonb("two_rm").default({}),
+  threeRm: jsonb("three_rm").default({}),
+  fourRm: jsonb("four_rm").default({}),
+  fiveRm: jsonb("five_rm").default({}),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Workout source enum for assignments
 const workoutSourceEnum = pgEnum("workout_source", [
   "custom_user",
@@ -412,8 +427,6 @@ async function parseWorkout(rawText: string, userId: string) {
 
     for (let i = 0; i < entities.length; i++) {
       const entity = entities[i];
-      console.log(`🔍 Processing entity ${i + 1}: "${entity.detectedName || 'Unnamed'}"`);
-
       // Parse as custom workout
       const customWorkout = parseAsCustomWorkoutEnhanced(entity, extractedDate, barbellLiftsList);
       parsedEntities.push(customWorkout);
@@ -1556,8 +1569,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           
           for (let i = 0; i < workoutEntities.length; i++) {
             const entity = workoutEntities[i];
-            console.log(`Processing entity ${i + 1}: "${entity.name}"`);
-            
             // Transform entity to match custom user workouts schema
             const customWorkoutData = {
               name: entity.name,
@@ -1988,6 +1999,336 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json(rankings);
       } catch (error) {
         return res.status(500).json({ message: "Failed to fetch leaderboard" });
+      }
+    }
+
+    // Get Barbell Lifts for Workout
+    if (method === 'GET' && pathname.match(/^\/api\/workouts\/\d+\/barbell-lifts$/)) {
+      try {
+        const workoutIdMatch = pathname.match(/\/api\/workouts\/(\d+)\/barbell-lifts$/);
+        if (!workoutIdMatch) {
+          return res.status(400).json({ error: 'Invalid workout ID' });
+        }
+
+        const workoutId = parseInt(workoutIdMatch[1]);
+        const { source } = req.query;
+
+        if (!source) {
+          return res.status(400).json({ 
+            error: 'Missing required parameter: source' 
+          });
+        }
+
+        if (isNaN(workoutId)) {
+          return res.status(400).json({ 
+            error: 'Invalid workoutId - must be a number' 
+          });
+        }
+
+        // Get barbell lifts associated with this workout
+        const result = await db
+          .select({
+            id: barbellLifts.id,
+            liftName: barbellLifts.liftName,
+          })
+          .from(workoutBarbellLifts)
+          .innerJoin(barbellLifts, eq(workoutBarbellLifts.barbellLiftId, barbellLifts.id))
+          .where(
+            and(
+              eq(workoutBarbellLifts.workoutId, workoutId),
+              eq(workoutBarbellLifts.sourceType, source as string)
+            )
+          )
+          .orderBy(barbellLifts.liftName);
+
+        return res.status(200).json(result);
+
+      } catch (error) {
+        console.error('Error fetching workout barbell lifts:', error);
+        
+        if (error instanceof Error) {
+          return res.status(500).json({ 
+            error: 'Failed to fetch barbell lifts',
+            details: error.message
+          });
+        }
+        
+        return res.status(500).json({ 
+          error: 'Internal server error occurred while fetching barbell lifts'
+        });
+      }
+    }
+
+    // Log Workout Results (Progress Tracking Algorithm)
+    if (method === 'POST' && pathname === '/api/workouts/log-workout') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ error: 'Authentication required' });
+      
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(401).json({ error: 'User authentication required' });
+      }
+
+      try {
+        const {
+          workoutId,
+          workoutSource,
+          date,
+          workoutName,
+          workoutType,
+          timeCap,
+          timeTaken,
+          totalEffort,
+          humanReadableScore,
+          barbellLiftDetails,
+          scaleType,
+          scaleDescription,
+          notes
+        } = req.body;
+
+        console.log('Received workout log data:', {
+          workoutId,
+          workoutSource,
+          date,
+          workoutName,
+          workoutType,
+          totalEffort
+        });
+
+        // Validate required fields
+        if (!workoutId || !workoutSource || !date || !workoutName || !workoutType) {
+          console.error('Missing required fields. Received:', {
+            workoutId: !!workoutId,
+            workoutSource: !!workoutSource,
+            date: !!date,
+            workoutName: !!workoutName,
+            workoutType: !!workoutType
+          });
+          return res.status(400).json({ 
+            error: 'Missing required fields: workoutId, workoutSource, date, workoutName, workoutType',
+            received: {
+              workoutId: !!workoutId,
+              workoutSource: !!workoutSource,
+              date: !!date,
+              workoutName: !!workoutName,
+              workoutType: !!workoutType
+            }
+          });
+        }
+
+        if (!totalEffort || totalEffort <= 0) {
+          return res.status(400).json({ 
+            error: 'Missing required field: totalEffort (must be > 0)' 
+          });
+        }
+
+        // Determine if workout was finished based on workout type and time
+        let finishedWorkout = true;
+        if (workoutType !== 'amrap' && timeCap && timeTaken && timeTaken >= timeCap) {
+          finishedWorkout = false;
+        }
+
+        // Calculate final score using basic algorithm (simplified for production)
+        let finalScore = 0;
+        if (workoutType === 'amrap') {
+          finalScore = totalEffort;
+        } else if (workoutType === 'for_time') {
+          if (timeCap && timeTaken) {
+            finalScore = Math.max(0, (timeCap - timeTaken) * totalEffort / 100);
+          } else {
+            finalScore = totalEffort;
+          }
+        } else {
+          finalScore = totalEffort;
+        }
+
+        console.log(`Calculated final score: ${finalScore} for ${workoutType} workout`);
+
+        // Insert workout log
+        const workoutLogResult = await db.insert(workoutLogs).values({
+          userId: userData.id,
+          workoutId,
+          date,
+          timeTaken,
+          totalEffort,
+          scaleType,
+          notes,
+          finalScore: finalScore.toString()
+        }).returning({ id: workoutLogs.id });
+
+        const workoutLogId = workoutLogResult[0].id;
+
+        // Update barbell lifts progress if there are barbell lift details
+        if (barbellLiftDetails && typeof barbellLiftDetails === 'object' && barbellLiftDetails !== null) {
+          const barbellLiftDetailsObj = barbellLiftDetails as Record<string, Record<string, number>>;
+          
+          if (Object.keys(barbellLiftDetailsObj).length > 0) {
+            try {
+              // Inline Progress Tracker functionality for Vercel compatibility
+              // Get barbell lifts associated with this workout
+              const workoutLifts = await db
+                .select({
+                  barbellLiftId: workoutBarbellLifts.barbellLiftId,
+                  liftName: barbellLifts.liftName,
+                })
+                .from(workoutBarbellLifts)
+                .innerJoin(barbellLifts, eq(workoutBarbellLifts.barbellLiftId, barbellLifts.id))
+                .where(
+                  and(
+                    eq(workoutBarbellLifts.workoutId, workoutId),
+                    eq(workoutBarbellLifts.sourceType, workoutSource)
+                  )
+                );
+
+              for (const [liftName, weightReps] of Object.entries(barbellLiftDetailsObj)) {
+              // Find the corresponding barbell lift
+              const workoutLift = workoutLifts.find(
+                lift => lift.liftName.toLowerCase() === liftName.toLowerCase()
+              );
+
+              if (!workoutLift) {
+                continue;
+              }
+
+              // Get or create progress record for this user and lift
+              let progressRecord = await db
+                .select()
+                .from(barbellLiftsProgress)
+                .where(
+                  and(
+                    eq(barbellLiftsProgress.userId, userData.id),
+                    eq(barbellLiftsProgress.barbellLiftId, workoutLift.barbellLiftId)
+                  )
+                )
+                .limit(1);
+
+              if (progressRecord.length === 0) {
+                // Create new progress record
+                await db.insert(barbellLiftsProgress).values({
+                  userId: userData.id,
+                  barbellLiftId: workoutLift.barbellLiftId,
+                  liftName: workoutLift.liftName,
+                  oneRm: {},
+                  twoRm: {},
+                  threeRm: {},
+                  fourRm: {},
+                  fiveRm: {},
+                });
+
+                // Fetch the newly created record
+                progressRecord = await db
+                  .select()
+                  .from(barbellLiftsProgress)
+                  .where(
+                    and(
+                      eq(barbellLiftsProgress.userId, userData.id),
+                      eq(barbellLiftsProgress.barbellLiftId, workoutLift.barbellLiftId)
+                    )
+                  )
+                  .limit(1);
+              }
+
+              const currentProgress = progressRecord[0];
+
+              // Update RM records based on the algorithm
+              for (const [weight, maxReps] of Object.entries(weightReps)) {
+                const weightNum = parseFloat(weight);
+                const reps = parseInt(maxReps.toString());
+
+                if (isNaN(weightNum) || isNaN(reps) || reps <= 0 || reps > 5) {
+                  continue;
+                }
+
+                // Update all rep maxes from 1RM to current reps
+                const updates: Record<string, any> = {};
+
+                for (let repMax = 1; repMax <= reps; repMax++) {
+                  let rmField: string;
+                  switch (repMax) {
+                    case 1: rmField = 'oneRm'; break;
+                    case 2: rmField = 'twoRm'; break;
+                    case 3: rmField = 'threeRm'; break;
+                    case 4: rmField = 'fourRm'; break;
+                    case 5: rmField = 'fiveRm'; break;
+                    default: continue;
+                  }
+
+                  // Get current RM data
+                  const currentRmData = (currentProgress[rmField as keyof typeof currentProgress] as Record<string, number>) || {};
+                  
+                  // Check if we need to update this RM
+                  const currentMaxWeight = Math.max(...Object.values(currentRmData), 0);
+                  
+                  if (weightNum > currentMaxWeight) {
+                    // Update the RM record with new date-weight entry
+                    const updatedRmData = {
+                      ...currentRmData,
+                      [date]: weightNum
+                    };
+                    
+                    updates[rmField] = updatedRmData;
+                  }
+                }
+
+                // Apply updates if any
+                if (Object.keys(updates).length > 0) {
+                  await db
+                    .update(barbellLiftsProgress)
+                    .set({
+                      ...updates,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(barbellLiftsProgress.id, currentProgress.id));
+                }
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error in barbell lifts progress update:', error);
+            // Don't throw - we still want to return success for the workout log
+          }
+        }
+        }
+
+        // Return success response with the workout log data
+        const response = {
+          success: true,
+          workoutLogId,
+          finalScore,
+          message: 'Workout logged successfully',
+          data: {
+            id: workoutLogId,
+            userId: userData.id,
+            workoutId,
+            date,
+            timeTaken,
+            totalEffort,
+            finalScore,
+            humanReadableScore: humanReadableScore || '',
+            scaleType,
+            scaleDescription,
+            barbellLiftDetails: barbellLiftDetails || {},
+            notes,
+            createdAt: new Date().toISOString()
+          }
+        };
+
+        console.log(`✅ Workout logged successfully for user ${userData.id}`);
+        return res.status(201).json(response);
+
+      } catch (error) {
+        console.error('❌ Error logging workout:', error);
+        
+        // Return appropriate error response
+        if (error instanceof Error) {
+          return res.status(500).json({ 
+            error: 'Failed to log workout',
+            details: error.message
+          });
+        }
+        
+        return res.status(500).json({ 
+          error: 'Internal server error occurred while logging workout'
+        });
       }
     }
 

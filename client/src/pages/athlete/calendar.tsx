@@ -251,48 +251,147 @@ export default function AthleteCalendar() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Enhanced Calendar */}
             <Card className="lg:col-span-2 border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
-              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg">
-                <CardTitle className="flex items-center text-xl">
-                  <div className="bg-gradient-to-r from-primary to-blue-600 p-2 rounded-lg mr-3">
-                    <CalendarIcon className="h-5 w-5 text-white" />
+              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg p-6">
+                <CardTitle className="flex items-center text-2xl">
+                  <div className="bg-gradient-to-r from-primary to-blue-600 p-3 rounded-xl mr-4 shadow-lg">
+                    <CalendarIcon className="h-6 w-6 text-white" />
                   </div>
-                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent font-bold">
                     Your Fitness Calendar
                   </span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6">
+              <CardContent className="p-8">
                 <div className="relative">
-                  <div className="absolute -inset-2 bg-gradient-to-r from-primary/10 to-blue-600/10 rounded-xl blur opacity-40"></div>
-                  <div className="relative bg-white rounded-xl p-4 shadow-sm">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
-                      modifiers={{
-                        workout: workoutDates,
-                        assigned: assignedDates
-                      }}
-                      modifiersStyles={{
-                        workout: {
-                          background: 'linear-gradient(135deg, #10b981, #059669)',
-                          color: 'white',
-                          borderRadius: '50%',
-                          boxShadow: '0 4px 8px rgba(16, 185, 129, 0.3)',
-                          transform: 'scale(1.1)',
-                          fontWeight: 'bold'
-                        },
-                        assigned: {
-                          background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                          color: 'white',
-                          borderRadius: '50%',
-                          boxShadow: '0 4px 8px rgba(59, 130, 246, 0.3)',
-                          transform: 'scale(1.1)',
-                          fontWeight: 'bold'
-                        }
-                      }}
-                      className="rounded-lg border-0 w-full"
-                    />
+                  <div className="absolute -inset-3 bg-gradient-to-r from-primary/10 to-blue-600/10 rounded-2xl blur opacity-50"></div>
+                  <div className="relative bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
+                    <style>{`
+                      .enhanced-calendar .rdp {
+                        --rdp-cell-size: 44px;
+                        --rdp-accent-color: #f97316;
+                        --rdp-background-color: #f97316;
+                        font-size: 0.9rem;
+                      }
+                      
+                      .enhanced-calendar .rdp-months {
+                        justify-content: center;
+                      }
+                      
+                      .enhanced-calendar .rdp-caption {
+                        padding: 1rem 0 1.2rem 0;
+                        text-align: center;
+                        position: relative;
+                      }
+                      
+                      .enhanced-calendar .rdp-caption_label {
+                        font-size: 1.3rem;
+                        font-weight: 700;
+                        color: #1f2937;
+                      }
+                      
+                      .enhanced-calendar .rdp-nav_button {
+                        width: 2rem;
+                        height: 2rem;
+                        border-radius: 0.5rem;
+                        background: linear-gradient(135deg, #f97316, #ea580c);
+                        color: white;
+                        border: none;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                      }
+                      
+                      .enhanced-calendar .rdp-nav_button:hover {
+                        background: linear-gradient(135deg, #ea580c, #dc2626);
+                        transform: translateY(-1px);
+                      }
+                      
+                      .enhanced-calendar .rdp-table {
+                        width: 100%;
+                        border-spacing: 2px;
+                      }
+                      
+                      .enhanced-calendar .rdp-head_cell {
+                        padding: 0.5rem 0;
+                        text-align: center;
+                        font-weight: 600;
+                        color: #6b7280;
+                        font-size: 0.75rem;
+                        text-transform: uppercase;
+                        letter-spacing: 0.025em;
+                      }
+                      
+                      .enhanced-calendar .rdp-cell {
+                        text-align: center;
+                        padding: 1px;
+                      }
+                      
+                      .enhanced-calendar .rdp-button {
+                        width: var(--rdp-cell-size);
+                        height: var(--rdp-cell-size);
+                        border-radius: 0.75rem;
+                        border: none;
+                        background: transparent;
+                        color: #374151;
+                        font-weight: 500;
+                        font-size: 0.9rem;
+                        cursor: pointer;
+                        transition: all 0.2s ease;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                      }
+                      
+                      .enhanced-calendar .rdp-button:hover {
+                        background: #f3f4f6;
+                        color: #1f2937;
+                      }
+                      
+                      .enhanced-calendar .rdp-button_selected {
+                        background: linear-gradient(135deg, #f97316, #ea580c) !important;
+                        color: white !important;
+                        font-weight: 700 !important;
+                        box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3) !important;
+                      }
+                      
+                      .enhanced-calendar .rdp-day_outside {
+                        color: #d1d5db;
+                      }
+                      
+                      .enhanced-calendar .rdp-day_today .rdp-button {
+                        background: #fef3c7;
+                        color: #92400e;
+                        font-weight: 600;
+                        border: 2px solid #f59e0b;
+                      }
+                    `}</style>
+                    <div className="enhanced-calendar">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        modifiers={{
+                          workout: workoutDates,
+                          assigned: assignedDates
+                        }}
+                        modifiersStyles={{
+                          workout: {
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            color: 'white',
+                            borderRadius: '0.75rem',
+                            fontWeight: '700',
+                            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                          },
+                          assigned: {
+                            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                            color: 'white',
+                            borderRadius: '0.75rem',
+                            fontWeight: '700',
+                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                          }
+                        }}
+                        className="rounded-xl border-0 w-full"
+                      />
+                    </div>
                   </div>
                 </div>
                 
@@ -391,6 +490,7 @@ export default function AthleteCalendar() {
                           <div className="flex gap-2">
                             <WorkoutLog
                               workout={assignment.workout}
+                              workoutSource={assignment.workoutSource || 'girl_wod'}
                               onLogCreated={() => {
                                 handleWorkoutLogged;
                                 refetchAssignments();
@@ -433,6 +533,7 @@ export default function AthleteCalendar() {
                               <span className="text-sm">{workout.name}</span>
                               <WorkoutLog
                                 workout={workout}
+                                workoutSource="custom_user"
                                 onLogCreated={handleWorkoutLogged}
                               />
                             </div>
@@ -517,6 +618,7 @@ export default function AthleteCalendar() {
                             
                             <WorkoutLog
                               workout={workout}
+                              workoutSource="custom_user"
                               onLogCreated={handleWorkoutLogged}
                             />
                           </div>
@@ -562,7 +664,7 @@ export default function AthleteCalendar() {
                     </Button>
                   </div>
                   <WorkoutParser 
-                    onWorkoutCreated={handleWorkoutCreated}
+                    onWorkoutsCreated={handleWorkoutCreated}
                     communityId={(user as any)?.membership?.community?.id}
                   />
                 </div>

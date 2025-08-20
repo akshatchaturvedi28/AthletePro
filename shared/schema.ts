@@ -217,7 +217,7 @@ export const workouts = pgTable("workouts", {
 export const workoutLogs = pgTable("workout_logs", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
-  workoutId: integer("workout_id").notNull().references(() => workouts.id),
+  workoutId: integer("workout_id").notNull(), // Removed foreign key constraint
   date: date("date").notNull(),
   timeTaken: integer("time_taken"), // in seconds
   totalEffort: integer("total_effort"),
@@ -330,7 +330,24 @@ export const benchmarkWorkouts = pgTable("benchmark_workouts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Olympic lifts progress
+// Barbell Lifts Progress - Rep Max Tracking per User
+export const barbellLiftsProgress = pgTable("barbell_lifts_progress", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  barbellLiftId: integer("barbell_lift_id").notNull().references(() => barbellLifts.id),
+  liftName: varchar("lift_name", { length: 255 }).notNull(),
+  oneRm: jsonb("1_rm").default('{}'),
+  twoRm: jsonb("2_rm").default('{}'),
+  threeRm: jsonb("3_rm").default('{}'),
+  fourRm: jsonb("4_rm").default('{}'),
+  fiveRm: jsonb("5_rm").default('{}'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("barbell_lifts_progress_user_lift_idx").on(table.userId, table.barbellLiftId),
+]);
+
+// Olympic lifts progress (legacy - keeping for backward compatibility during transition)
 export const olympicLifts = pgTable("olympic_lifts", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -400,6 +417,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   memberships: many(communityMemberships),
   workoutLogs: many(workoutLogs),
   olympicLifts: many(olympicLifts),
+  barbellLiftsProgress: many(barbellLiftsProgress),
   createdWorkouts: many(workouts),
 }));
 
@@ -426,6 +444,17 @@ export const workoutsRelations = relations(workouts, ({ one, many }) => ({
 export const workoutLogsRelations = relations(workoutLogs, ({ one }) => ({
   user: one(users, { fields: [workoutLogs.userId], references: [users.id] }),
   workout: one(workouts, { fields: [workoutLogs.workoutId], references: [workouts.id] }),
+}));
+
+// Barbell lifts progress relations
+export const barbellLiftsProgressRelations = relations(barbellLiftsProgress, ({ one }) => ({
+  user: one(users, { fields: [barbellLiftsProgress.userId], references: [users.id] }),
+  barbellLift: one(barbellLifts, { fields: [barbellLiftsProgress.barbellLiftId], references: [barbellLifts.id] }),
+}));
+
+export const barbellLiftsRelations = relations(barbellLifts, ({ many }) => ({
+  progress: many(barbellLiftsProgress),
+  workoutAssociations: many(workoutBarbellLifts),
 }));
 
 // Admin relations
@@ -529,6 +558,12 @@ export const insertCommunityWorkoutAssignmentSchema = createInsertSchema(communi
   createdAt: true,
 });
 
+export const insertBarbellLiftsProgressSchema = createInsertSchema(barbellLiftsProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -571,6 +606,8 @@ export type UserWorkoutAssignment = typeof userWorkoutAssignments.$inferSelect;
 export type InsertUserWorkoutAssignment = z.infer<typeof insertUserWorkoutAssignmentSchema>;
 export type CommunityWorkoutAssignment = typeof communityWorkoutAssignments.$inferSelect;
 export type InsertCommunityWorkoutAssignment = z.infer<typeof insertCommunityWorkoutAssignmentSchema>;
+export type BarbellLiftsProgress = typeof barbellLiftsProgress.$inferSelect;
+export type InsertBarbellLiftsProgress = z.infer<typeof insertBarbellLiftsProgressSchema>;
 
 // Extended types for authentication
 export type UserWithMembership = User & {
