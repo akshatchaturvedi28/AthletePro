@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { 
   Calendar, 
   TrendingUp, 
@@ -13,7 +14,9 @@ import {
   Dumbbell,
   Target,
   UserCog,
-  LogOut
+  LogOut,
+  ChevronDown,
+  ArrowLeftRight
 } from "lucide-react";
 
 interface SidebarProps {
@@ -21,73 +24,87 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className }: SidebarProps) {
-  const { user, logout } = useAuth();
+  const { 
+    user, 
+    admin, 
+    logout, 
+    accountType, 
+    hasLinkedAccount, 
+    linkedAccountRole,
+    transitionToAdmin,
+    transitionToUser 
+  } = useAuth();
   const [location] = useLocation();
 
-  const isAthlete = (user as any)?.accountType === 'user' || !(user as any)?.membership || (user as any)?.membership?.role === "athlete";
-  const isCoach = (user as any)?.accountType === 'admin' || (user as any)?.role === 'coach' || (user as any)?.role === 'community_manager' || (user as any)?.membership?.role === "coach" || (user as any)?.membership?.role === "manager";
-
-  const athleteNavigation = [
+  // User Console Navigation (Athletes)
+  const userNavigation = [
     {
       name: "Dashboard",
-      href: "/dashboard",
+      href: "/athlete/dashboard",
       icon: BarChart3,
-      current: location === "/dashboard" || location === "/"
+      current: location === "/athlete/dashboard" || location === "/" || location === "/dashboard"
     },
     {
       name: "Calendar",
-      href: "/calendar",
+      href: "/athlete/calendar",
       icon: Calendar,
-      current: location === "/calendar"
+      current: location === "/athlete/calendar" || location === "/calendar"
     },
     {
       name: "Progress",
-      href: "/progress",
+      href: "/athlete/progress",
       icon: TrendingUp,
-      current: location === "/progress"
+      current: location === "/athlete/progress" || location === "/progress"
     },
     {
       name: "Profile",
-      href: "/profile",
+      href: "/athlete/profile",
       icon: User,
-      current: location === "/profile"
+      current: location === "/athlete/profile" || location === "/profile"
     }
   ];
 
-  const coachNavigation = [
+  // The sidebar is primarily used by the User Console
+  // Admin Console uses navbar.tsx, but if somehow admin uses sidebar, show basic navigation
+  const adminNavigation = [
     {
-      name: "Dashboard",
-      href: "/dashboard",
+      name: "Admin Console",
+      href: "/admin/console",
       icon: BarChart3,
-      current: location === "/dashboard" || location === "/"
+      current: location === "/admin/console" || location === "/"
     },
     {
       name: "Community",
-      href: "/community",
+      href: "/admin/manage-community",
       icon: Users,
-      current: location === "/community"
-    },
-    {
-      name: "Leaderboard",
-      href: "/leaderboard",
-      icon: Trophy,
-      current: location === "/leaderboard"
-    },
-    {
-      name: "Progress",
-      href: "/progress",
-      icon: TrendingUp,
-      current: location === "/progress"
+      current: location === "/admin/manage-community"
     },
     {
       name: "Profile",
-      href: "/profile",
+      href: "/admin/admin-account",
       icon: User,
-      current: location === "/profile"
+      current: location === "/admin/admin-account"
     }
   ];
 
-  const navigation = isCoach ? coachNavigation : athleteNavigation;
+  // Determine navigation based on account type
+  const navigation = accountType === 'admin' ? adminNavigation : userNavigation;
+  const currentUser = accountType === 'admin' ? admin : user;
+  const currentMode = accountType === 'admin' ? 
+    (admin?.role === 'community_manager' ? 'Manager Mode' : 'Coach Mode') : 
+    'Athlete Mode';
+
+  const handleAccountTransition = async () => {
+    try {
+      if (accountType === 'user' && hasLinkedAccount) {
+        await transitionToAdmin();
+      } else if (accountType === 'admin' && hasLinkedAccount) {
+        await transitionToUser();
+      }
+    } catch (error) {
+      console.error('Account transition failed:', error);
+    }
+  };
 
   return (
     <div className={cn("fixed left-0 top-0 z-40 flex flex-col w-64 h-screen bg-white border-r border-gray-200", className)}>
@@ -122,19 +139,36 @@ export function Sidebar({ className }: SidebarProps) {
           <div className="flex-shrink-0">
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-medium">
-                {user?.firstName?.[0] || user?.email?.[0] || "U"}
+                {currentUser?.firstName?.[0] || currentUser?.email?.[0] || "U"}
               </span>
             </div>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
-              {user?.firstName} {user?.lastName}
+              {currentUser?.firstName} {currentUser?.lastName}
             </p>
             <p className="text-xs text-gray-500 truncate">
-              {(user as any)?.role || (user as any)?.membership?.role || "Athlete"}
+              {currentMode}
             </p>
           </div>
         </div>
+
+        {/* Account Switching */}
+        {hasLinkedAccount && (
+          <div className="mb-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start text-primary hover:bg-primary/10 border-primary/20"
+              onClick={handleAccountTransition}
+            >
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Switch to {accountType === 'user' ? 
+                (linkedAccountRole === 'community_manager' ? 'Manager' : 'Coach') : 
+                'Athlete'} Mode
+            </Button>
+          </div>
+        )}
         
         <Button 
           variant="outline" 

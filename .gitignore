@@ -9,3 +9,4 @@ attached_assets
 *.md
 .clinerules
 migrations
+.cline

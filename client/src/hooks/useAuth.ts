@@ -74,7 +74,8 @@ interface AdminWithCommunity extends Admin {
 }
 
 interface AuthState {
-  user: UserWithMembership | AdminWithCommunity | null;
+  user: UserWithMembership | null;
+  admin: AdminWithCommunity | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   needsRegistration: boolean;
@@ -107,6 +108,7 @@ interface AuthResult {
 
 let authState: AuthState = {
   user: null,
+  admin: null,
   isLoading: true,
   isAuthenticated: false,
   needsRegistration: false,
@@ -142,16 +144,18 @@ async function initializeAuth() {
       console.log('📋 Auth session data:', data);
       
       if (data.authenticated) {
-        const user = data.user || data.admin;
+        const user = data.user;
+        const admin = data.admin;
         const accountType = data.accountType;
         const hasLinkedAccount = data.hasLinkedAccount || false;
         const linkedAccountRole = data.linkedAccountRole || null;
         
-        console.log('✅ User authenticated:', user?.email || 'unknown');
-        console.log('🔄 Setting auth state for user:', user, 'accountType:', accountType);
+        console.log('✅ User authenticated:', (user?.email || admin?.email) || 'unknown');
+        console.log('🔄 Setting auth state - user:', user, 'admin:', admin, 'accountType:', accountType);
         
         updateAuthState({
-          user: { ...user, accountType },
+          user: user ? { ...user, accountType: 'user' } : null,
+          admin: admin ? { ...admin, accountType: 'admin' } : null,
           isAuthenticated: true,
           isLoading: false,
           needsRegistration: false,
@@ -163,6 +167,7 @@ async function initializeAuth() {
         console.log('❌ User not authenticated');
         updateAuthState({
           user: null,
+          admin: null,
           isAuthenticated: false,
           isLoading: false,
           needsRegistration: false,
@@ -175,6 +180,7 @@ async function initializeAuth() {
       console.log('❌ Auth session endpoint failed with status:', response.status);
       updateAuthState({
         user: null,
+        admin: null,
         isAuthenticated: false,
         isLoading: false,
         needsRegistration: false,
@@ -187,6 +193,7 @@ async function initializeAuth() {
     console.error('❌ Failed to initialize auth:', error);
     updateAuthState({
       user: null,
+      admin: null,
       isAuthenticated: false,
       isLoading: false,
       needsRegistration: false,
@@ -300,7 +307,7 @@ export const authService = {
       
       if (response.ok && result.success) {
         updateAuthState({
-          user: { ...result.admin, accountType: 'admin' },
+          admin: { ...result.admin, accountType: 'admin' },
           isAuthenticated: true,
           isLoading: false,
           needsRegistration: false,
@@ -337,7 +344,7 @@ export const authService = {
       
       if (response.ok && result.success) {
         updateAuthState({
-          user: { ...result.admin, accountType: 'admin' },
+          admin: { ...result.admin, accountType: 'admin' },
           isAuthenticated: true,
           isLoading: false,
           needsRegistration: false,
@@ -375,7 +382,8 @@ export const authService = {
       
       if (response.ok && result.success) {
         updateAuthState({
-          user: { ...result.admin, accountType: 'admin' },
+          user: null,
+          admin: { ...result.admin, accountType: 'admin' },
           accountType: 'admin',
           hasLinkedAccount: true,
           linkedAccountRole: 'athlete'
@@ -408,9 +416,10 @@ export const authService = {
       if (response.ok && result.success) {
         updateAuthState({
           user: { ...result.user, accountType: 'user' },
+          admin: null,
           accountType: 'user',
           hasLinkedAccount: true,
-          linkedAccountRole: authState.user?.role || 'coach'
+          linkedAccountRole: authState.admin?.role || 'coach'
         });
         
         return {
@@ -440,6 +449,7 @@ export const authService = {
     } finally {
       updateAuthState({
         user: null,
+        admin: null,
         isAuthenticated: false,
         isLoading: false,
         needsRegistration: false,

@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -44,7 +44,8 @@ import CoachCommunity from "@/pages/coach/community";
 import CoachLeaderboard from "@/pages/coach/leaderboard";
 
 function Router() {
-  const { isAuthenticated, isLoading, user, needsRegistration, refresh } = useAuth();
+  const { isAuthenticated, isLoading, user, admin, needsRegistration, refresh, accountType } = useAuth();
+  const [location, navigate] = useLocation();
 
   // Check if user just came back from OAuth
   useEffect(() => {
@@ -57,6 +58,19 @@ function Router() {
       refresh();
     }
   }, [refresh]);
+
+  // Route guards: Redirect users to appropriate console if they end up on wrong routes
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      if (accountType === 'user' && location.startsWith('/admin/')) {
+        console.log('🛡️ Route guard: User on admin route, redirecting to athlete dashboard');
+        navigate('/athlete/dashboard');
+      } else if (accountType === 'admin' && location.startsWith('/athlete/')) {
+        console.log('🛡️ Route guard: Admin on athlete route, redirecting to admin console');
+        navigate('/admin/console');
+      }
+    }
+  }, [accountType, location, navigate, isAuthenticated, isLoading]);
 
   // Always show loading state while checking authentication
   if (isLoading) {
@@ -72,20 +86,22 @@ function Router() {
     return <Registration />;
   }
 
-  console.log('🔍 Router state:', { 
+  console.log('🔍 Dual Console Router state:', { 
     isAuthenticated, 
+    accountType,
     user: user?.email, 
-    userId: (user as any)?.id,
+    admin: admin?.email,
+    userRole: user?.role,
+    adminRole: admin?.role,
     isLoading, 
-    currentPath: window.location.pathname,
-    accountType: (user as any)?.accountType,
-    role: (user as any)?.role 
+    currentPath: window.location.pathname
   });
 
   return (
     <Switch>
       {!isAuthenticated ? (
         <>
+          {/* Public Routes */}
           <Route path="/" component={Landing} />
           <Route path="/community" component={CommunityLanding} />
           <Route path="/about" component={About} />
@@ -105,40 +121,56 @@ function Router() {
         </>
       ) : (
         <>
-          {/* Check user role and redirect accordingly - Admin users have admin_ ID prefix or Coach/Manager occupation */}
-          {(user as any)?.id?.startsWith('admin_') || (user as any)?.occupation === 'Coach' || (user as any)?.occupation === 'Community Manager' || (user as any)?.membership?.role === "manager" || (user as any)?.membership?.role === "coach" || (user as any)?.accountType === 'admin' || (user as any)?.role === 'coach' || (user as any)?.role === 'community_manager' ? (
+          {/* Dual Console Routing Based on Account Type */}
+          {accountType === 'admin' ? (
             <>
-              <Route path="/" component={CoachDashboard} />
-              <Route path="/dashboard" component={CoachDashboard} />
-              <Route path="/community" component={CoachCommunity} />
-              <Route path="/leaderboard" component={CoachLeaderboard} />
+              {/* Admin Console Routes */}
+              <Route path="/" component={AdminConsole} />
               <Route path="/admin" component={AdminConsole} />
               <Route path="/admin/console" component={AdminConsole} />
-              <Route path="/admin/manage-community" component={ManageCommunity} />
-              <Route path="/admin/coach" component={CoachDashboard} />
-              <Route path="/admin/account" component={AdminAccount} />
-              <Route path="/admin/create-community" component={CreateCommunity} />
-              <Route path="/profile" component={AthleteProfile} />
-              <Route path="/progress" component={AthleteProgress} />
-              <Route path="/account" component={AthleteAccount} />
+              {/* Community Manager-specific routes */}
+              {admin?.role === 'community_manager' && (
+                <>
+                  <Route path="/admin/manage-community" component={ManageCommunity} />
+                  <Route path="/admin/create-community" component={CreateCommunity} />
+                </>
+              )}
+
+              {/* Shared admin routes */}
+              <Route path="/admin/dashboard" component={CoachDashboard} />
+              <Route path="/admin/leaderboard" component={CoachLeaderboard} />
+              <Route path="/admin/admin-account" component={AdminAccount} />
             </>
           ) : (
             <>
+              {/* User Console Routes */}
               <Route path="/" component={AthleteDashboard} />
-              <Route path="/dashboard" component={AthleteDashboard} />
+              <Route path="/athlete" component={AthleteDashboard} />
               <Route path="/athlete/dashboard" component={AthleteDashboard} />
+              <Route path="/athlete/calendar" component={AthleteCalendar} />
+              <Route path="/athlete/profile" component={AthleteProfile} />
+              <Route path="/athlete/progress" component={AthleteProgress} />
+              <Route path="/athlete/account" component={AthleteAccount} />
+              
+              {/* Legacy athlete routes (backward compatibility) */}
+              <Route path="/dashboard" component={AthleteDashboard} />
               <Route path="/calendar" component={AthleteCalendar} />
               <Route path="/profile" component={AthleteProfile} />
               <Route path="/progress" component={AthleteProgress} />
               <Route path="/account" component={AthleteAccount} />
+              
+              {/* Public athlete profile */}
               <Route path="/athlete/:id">
                 {(params) => <PublicProfile athleteId={params.id} />}
               </Route>
             </>
           )}
+
+          {/* Shared authenticated routes */}
           <Route path="/about" component={About} />
           <Route path="/contact" component={Contact} />
           <Route path="/privacy" component={Privacy} />
+          <Route path="/feedback" component={Feedback} />
         </>
       )}
       <Route component={NotFound} />

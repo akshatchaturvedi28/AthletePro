@@ -270,7 +270,7 @@ function setCorsHeaders(res: VercelResponse) {
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
 // Helper functions for authentication
-function createAuthToken(user: any, accountType: 'user' | 'admin') {
+function createAuthToken(user: any, accountType: 'user' | 'admin', linkedInfo?: { hasLinkedAccount: boolean; linkedAccountRole: string | null }) {
   return jwt.sign(
     {
       id: user.id,
@@ -279,7 +279,9 @@ function createAuthToken(user: any, accountType: 'user' | 'admin') {
       lastName: user.lastName,
       username: user.username,
       role: user.role,
-      accountType
+      accountType,
+      hasLinkedAccount: linkedInfo?.hasLinkedAccount || false,
+      linkedAccountRole: linkedInfo?.linkedAccountRole || null
     },
     JWT_SECRET,
     { expiresIn: '7d' }
@@ -323,6 +325,27 @@ function clearAuthCookie(res: VercelResponse) {
   res.setHeader('Set-Cookie', [
     'auth-token=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax',
   ]);
+}
+
+// Dual Auth Helper Functions - Extracted from dualAuth.ts for Vercel compatibility
+async function getLinkedAdminAccount(email: string) {
+  try {
+    const admin = await db.select().from(admins).where(eq(admins.email, email)).limit(1);
+    return admin[0] || null;
+  } catch (error) {
+    console.error('Error checking linked admin account:', error);
+    return null;
+  }
+}
+
+async function getLinkedUserAccount(email: string) {
+  try {
+    const user = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return user[0] || null;
+  } catch (error) {
+    console.error('Error checking linked user account:', error);
+    return null;
+  }
 }
 
 // Workout Parsing Algorithm (Production Version)
@@ -1099,6 +1122,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const token = createAuthToken(newAdmin[0], 'admin');
       setAuthCookie(res, token);
 
+      // Role-based redirects
+      const redirectUrl = role === 'community_manager' 
+        ? '/admin/manage-community' 
+        : '/admin/console';
+
       return res.status(201).json({
         success: true,
         message: 'Admin created successfully',
@@ -1109,10 +1137,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           firstName: newAdmin[0].firstName,
           lastName: newAdmin[0].lastName
         },
-        redirectUrl: '/admin/console'
+        redirectUrl
       });
     }
-
     // Admin Signin
     if (method === 'POST' && pathname === '/api/auth/admin/signin') {
       const { email, password } = req.body;
@@ -1144,27 +1171,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           firstName: admin[0].firstName,
           lastName: admin[0].lastName
         },
-        redirectUrl: '/coach/dashboard'
+        redirectUrl: '/admin/console'
       });
     }
 
-    // Session Check
+    // Session Check (Enhanced with Linking Detection)
     if (method === 'GET' && pathname === '/api/auth/session') {
       const token = getAuthToken(req);
       
       if (token) {
         const userData = verifyAuthToken(token);
         if (userData) {
-          const responseData = {
-            authenticated: true,
-            accountType: userData.accountType,
-            hasLinkedAccount: false,
-            linkedAccountRole: null
-          };
+          // Check for linked accounts
+          let hasLinkedAccount = false;
+          let linkedAccountRole: string | null = null;
 
           if (userData.accountType === 'user') {
+            const linkedAdmin = await getLinkedAdminAccount(userData.email);
+            if (linkedAdmin) {
+              hasLinkedAccount = true;
+              linkedAccountRole = linkedAdmin.role as string;
+            }
+
             return res.status(200).json({
-              ...responseData,
+              authenticated: true,
+              accountType: 'user',
+              hasLinkedAccount,
+              linkedAccountRole,
               user: {
                 id: userData.id,
                 email: userData.email,
@@ -1176,8 +1209,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               admin: null
             });
           } else {
+            const linkedUser = await getLinkedUserAccount(userData.email);
+            if (linkedUser) {
+              hasLinkedAccount = true;
+              linkedAccountRole = linkedUser.role as string;
+            }
+
             return res.status(200).json({
-              ...responseData,
+              authenticated: true,
+              accountType: 'admin',
+              hasLinkedAccount,
+              linkedAccountRole,
               user: null,
               admin: {
                 id: userData.id,
@@ -1200,6 +1242,102 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         hasLinkedAccount: false,
         linkedAccountRole: null
       });
+    }
+
+    // Account Transition: User to Admin
+    if (method === 'POST' && pathname === '/api/auth/transition/user-to-admin') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ success: false, error: 'Authentication required' });
+
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'user') {
+        return res.status(403).json({ success: false, error: 'User account required for transition' });
+      }
+
+      try {
+        // Check if user has linked admin account
+        const linkedAdmin = await getLinkedAdminAccount(userData.email);
+        if (!linkedAdmin) {
+          return res.status(404).json({ 
+            success: false, 
+            error: 'No admin account found with the same email address' 
+          });
+        }
+
+        // Create new token for admin account with linking info
+        const linkedInfo = { hasLinkedAccount: true, linkedAccountRole: 'athlete' };
+        const adminToken = createAuthToken(linkedAdmin, 'admin', linkedInfo);
+        setAuthCookie(res, adminToken);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Successfully switched to admin console',
+          admin: {
+            id: linkedAdmin.id,
+            email: linkedAdmin.email,
+            firstName: linkedAdmin.firstName,
+            lastName: linkedAdmin.lastName,
+            username: linkedAdmin.username,
+            role: linkedAdmin.role
+          },
+          accountType: 'admin',
+          redirectUrl: '/admin/console'
+        });
+      } catch (error) {
+        console.error('Transition to admin error:', error);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to switch to admin console' 
+        });
+      }
+    }
+
+    // Account Transition: Admin to User
+    if (method === 'POST' && pathname === '/api/auth/transition/admin-to-user') {
+      const token = getAuthToken(req);
+      if (!token) return res.status(401).json({ success: false, error: 'Authentication required' });
+
+      const userData = verifyAuthToken(token);
+      if (!userData || userData.accountType !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Admin account required for transition' });
+      }
+
+      try {
+        // Check if admin has linked user account
+        const linkedUser = await getLinkedUserAccount(userData.email);
+        if (!linkedUser) {
+          return res.status(404).json({ 
+            success: false, 
+            error: 'No user account found with the same email address' 
+          });
+        }
+
+        // Create new token for user account with linking info
+        const linkedInfo = { hasLinkedAccount: true, linkedAccountRole: userData.role };
+        const userToken = createAuthToken(linkedUser, 'user', linkedInfo);
+        setAuthCookie(res, userToken);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Successfully switched to user console',
+          user: {
+            id: linkedUser.id,
+            email: linkedUser.email,
+            firstName: linkedUser.firstName,
+            lastName: linkedUser.lastName,
+            username: linkedUser.username,
+            role: linkedUser.role
+          },
+          accountType: 'user',
+          redirectUrl: '/athlete/dashboard'
+        });
+      } catch (error) {
+        console.error('Transition to user error:', error);
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to switch to user console' 
+        });
+      }
     }
 
     // Logout

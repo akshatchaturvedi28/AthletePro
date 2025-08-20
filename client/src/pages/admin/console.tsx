@@ -9,7 +9,7 @@ import { Users, Dumbbell, BarChart, Settings, Activity, TrendingUp, LogOut, User
 import { Navbar } from "@/components/layout/navbar";
 
 export default function AdminConsole() {
-  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const { user, admin, isLoading, isAuthenticated, accountType, logout } = useAuth();
   const [selectedTab, setSelectedTab] = useState("overview");
 
   // Redirect if not authenticated
@@ -37,7 +37,7 @@ export default function AdminConsole() {
     );
   }
 
-  if (!user) {
+  if (!admin || accountType !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-8">
@@ -63,10 +63,10 @@ export default function AdminConsole() {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Console</h1>
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="capitalize">
-                  {(user as any)?.role || 'Admin'}
+                  {admin?.role || 'Admin'}
                 </Badge>
                 <span className="text-gray-600">
-                  {user?.email}
+                  {admin?.email}
                 </span>
               </div>
             </div>
@@ -75,7 +75,7 @@ export default function AdminConsole() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  {user?.firstName || user?.email || 'Admin'}
+                  {admin?.firstName || admin?.email || 'Admin'}
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>

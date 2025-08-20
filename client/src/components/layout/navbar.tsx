@@ -20,7 +20,17 @@ import {
 import { useState } from "react";
 
 export function Navbar() {
-  const { user, isAuthenticated } = useAuth();
+  const { 
+    user, 
+    admin, 
+    isAuthenticated, 
+    accountType, 
+    hasLinkedAccount, 
+    linkedAccountRole,
+    transitionToAdmin,
+    transitionToUser,
+    logout 
+  } = useAuth();
   const [, navigate] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -92,48 +102,54 @@ export function Navbar() {
               </>
             ) : (
               <>
-                <Link
-                  href="/dashboard"
-                  className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Dashboard
-                </Link>
-                {user?.membership?.role === "athlete" && (
-                  <Link
-                    href="/calendar"
-                    className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    Calendar
-                  </Link>
-                )}
-                {(user?.membership?.role === "manager" || user?.membership?.role === "coach") && (
+                {/* User Console Navigation */}
+                {accountType === 'user' && (
                   <>
                     <Link
-                      href="/admin"
+                      href="/athlete/dashboard"
+                      className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link
+                      href="/athlete/calendar"
+                      className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
+                    >
+                      Calendar
+                    </Link>
+                    <Link
+                      href="/athlete/progress"
+                      className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
+                    >
+                      Progress
+                    </Link>
+                  </>
+                )}
+                
+                {/* Admin Console Navigation */}
+                {accountType === 'admin' && (
+                  <>
+                    <Link
+                      href="/admin/console"
                       className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
                     >
                       Admin Console
                     </Link>
                     <Link
-                      href="/community"
+                      href="/admin/manage-community"
                       className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
                     >
                       Community
                     </Link>
                     <Link
-                      href="/leaderboard"
+                      href="/admin/leaderboard" 
                       className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
                     >
                       Leaderboard
                     </Link>
                   </>
                 )}
-                <Link
-                  href="/progress"
-                  className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Progress
-                </Link>
+                
                 <Link
                   href="/"
                   className="text-gray-600 hover:text-primary transition-colors px-3 py-2 rounded-md text-sm font-medium"
@@ -178,24 +194,68 @@ export function Navbar() {
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
                       <p className="font-medium">
-                        {user?.firstName} {user?.lastName}
+                        {accountType === 'user' 
+                          ? `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email
+                          : `${admin?.firstName || ''} ${admin?.lastName || ''}`.trim() || admin?.email
+                        }
                       </p>
                       <p className="w-[200px] truncate text-sm text-muted-foreground">
-                        {user?.email}
+                        {accountType === 'user' ? user?.email : admin?.email}
+                      </p>
+                      <p className="text-xs text-blue-600 capitalize">
+                        {accountType === 'user' ? 'Athlete Mode' : `${admin?.role || 'Admin'} Mode`}
                       </p>
                     </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                  
+                  {/* Account Switching */}
+                  {hasLinkedAccount && (
+                    <>
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      try {
+                        if (accountType === 'user') {
+                          const result = await transitionToAdmin();
+                          if (result.success && result.redirectUrl) {
+                            console.log('🔄 Transitioning to admin, redirecting to:', result.redirectUrl);
+                            navigate(result.redirectUrl);
+                          }
+                        } else {
+                          const result = await transitionToUser();
+                          if (result.success && result.redirectUrl) {
+                            console.log('🔄 Transitioning to user, redirecting to:', result.redirectUrl);
+                            navigate(result.redirectUrl);
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Account transition error:', error);
+                      }
+                    }}
+                  >
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>
+                          Switch to {accountType === 'user' ? `${linkedAccountRole} Mode` : 'Athlete Mode'}
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  
+                  <DropdownMenuItem onClick={() => navigate(accountType === 'user' ? '/athlete/account' : '/admin/admin-account')}>
                     <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                    <span>Account Settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
+                  <DropdownMenuItem onClick={async () => {
+                    try {
+                      await logout();
+                      window.location.href = '/';
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                      window.location.href = '/';
+                    }
+                  }}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>
@@ -233,40 +293,52 @@ export function Navbar() {
                 </>
               ) : (
                 <>
-                  <Link
-                    href="/dashboard"
-                    className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                  {user?.membership?.role === "athlete" && (
-                    <Link
-                      href="/calendar"
-                      className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Calendar
-                    </Link>
-                  )}
-                  {(user?.membership?.role === "manager" || user?.membership?.role === "coach") && (
+                  {/* User Console Mobile Navigation */}
+                  {accountType === 'user' && (
                     <>
                       <Link
-                        href="/admin"
+                        href="/athlete/dashboard"
+                        className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Dashboard
+                      </Link>
+                      <Link
+                        href="/athlete/calendar"
+                        className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Calendar
+                      </Link>
+                      <Link
+                        href="/athlete/progress"
+                        className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Progress
+                      </Link>
+                    </>
+                  )}
+                  
+                  {/* Admin Console Mobile Navigation */}
+                  {accountType === 'admin' && (
+                    <>
+                      <Link
+                        href="/admin/console"
                         className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Admin Console
                       </Link>
                       <Link
-                        href="/community"
+                        href="/admin/manage-community"
                         className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Community
                       </Link>
                       <Link
-                        href="/leaderboard"
+                        href="/admin/leaderboard"
                         className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -274,13 +346,7 @@ export function Navbar() {
                       </Link>
                     </>
                   )}
-                  <Link
-                    href="/progress"
-                    className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Progress
-                  </Link>
+                  
                   <Link
                     href="/"
                     className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-primary"
