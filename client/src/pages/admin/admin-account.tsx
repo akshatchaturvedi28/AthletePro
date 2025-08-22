@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 import { 
   User, 
   Settings, 
@@ -82,7 +83,8 @@ export default function AdminAccount() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <AdminLayout>
+      <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -571,6 +573,7 @@ export default function AdminAccount() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AdminLayout>
   );
 }

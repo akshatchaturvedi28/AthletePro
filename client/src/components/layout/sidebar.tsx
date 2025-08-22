@@ -64,8 +64,7 @@ export function Sidebar({ className }: SidebarProps) {
     }
   ];
 
-  // The sidebar is primarily used by the User Console
-  // Admin Console uses navbar.tsx, but if somehow admin uses sidebar, show basic navigation
+  // Admin Console Navigation
   const adminNavigation = [
     {
       name: "Admin Console",
@@ -78,6 +77,12 @@ export function Sidebar({ className }: SidebarProps) {
       href: "/admin/manage-community",
       icon: Users,
       current: location === "/admin/manage-community"
+    },
+    {
+      name: "Leaderboard",
+      href: "/admin/leaderboard",
+      icon: Trophy,
+      current: location === "/admin/leaderboard"
     },
     {
       name: "Profile",

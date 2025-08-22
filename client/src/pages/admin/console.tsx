@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Users, Dumbbell, BarChart, Settings, Activity, TrendingUp, LogOut, User, ChevronDown } from "lucide-react";
-import { Navbar } from "@/components/layout/navbar";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 
 export default function AdminConsole() {
   const { user, admin, isLoading, isAuthenticated, accountType, logout } = useAuth();
@@ -54,9 +54,8 @@ export default function AdminConsole() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <div className="container mx-auto px-4 py-8">
+    <AdminLayout>
+      <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <div className="flex justify-between items-start">
             <div>
@@ -80,7 +79,7 @@ export default function AdminConsole() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => window.location.href = '/admin/account'}>
+                <DropdownMenuItem onClick={() => window.location.href = '/admin/admin-account'}>
                   <User className="h-4 w-4 mr-2" />
                   Account Settings
                 </DropdownMenuItem>
@@ -271,6 +270,6 @@ export default function AdminConsole() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

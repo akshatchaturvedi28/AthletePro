@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AdminLayout } from "@/components/layout/AdminLayout";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Users, 
@@ -86,7 +87,11 @@ export default function ManageCommunity() {
   // Member management mutations
   const addMemberMutation = useMutation({
     mutationFn: (data: { email: string; role: 'athlete' | 'coach' }) => 
-      apiRequest('/api/admin/community/members', { method: 'POST', body: data }),
+      fetch('/api/admin/community/members', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data) 
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/community/members'] });
       setShowAddMember(false);
@@ -95,7 +100,7 @@ export default function ManageCommunity() {
 
   const removeMemberMutation = useMutation({
     mutationFn: (memberId: string) => 
-      apiRequest(`/api/admin/community/members/${memberId}`, { method: 'DELETE' }),
+      fetch(`/api/admin/community/members/${memberId}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/community/members'] });
     }
@@ -104,7 +109,11 @@ export default function ManageCommunity() {
   // Announcement mutations
   const createAnnouncementMutation = useMutation({
     mutationFn: (data: { title: string; content: string; type: string }) => 
-      apiRequest('/api/admin/community/announcements', { method: 'POST', body: data }),
+      fetch('/api/admin/community/announcements', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data) 
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/community/announcements'] });
       setShowAddAnnouncement(false);
@@ -123,7 +132,8 @@ export default function ManageCommunity() {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <AdminLayout>
+      <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -488,7 +498,8 @@ export default function ManageCommunity() {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </AdminLayout>
   );
 }
 

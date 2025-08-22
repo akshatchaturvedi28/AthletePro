@@ -209,38 +209,6 @@ export function Navbar() {
                   </div>
                   <DropdownMenuSeparator />
                   
-                  {/* Account Switching */}
-                  {hasLinkedAccount && (
-                    <>
-                  <DropdownMenuItem 
-                    onClick={async () => {
-                      try {
-                        if (accountType === 'user') {
-                          const result = await transitionToAdmin();
-                          if (result.success && result.redirectUrl) {
-                            console.log('🔄 Transitioning to admin, redirecting to:', result.redirectUrl);
-                            navigate(result.redirectUrl);
-                          }
-                        } else {
-                          const result = await transitionToUser();
-                          if (result.success && result.redirectUrl) {
-                            console.log('🔄 Transitioning to user, redirecting to:', result.redirectUrl);
-                            navigate(result.redirectUrl);
-                          }
-                        }
-                      } catch (error) {
-                        console.error('Account transition error:', error);
-                      }
-                    }}
-                  >
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>
-                          Switch to {accountType === 'user' ? `${linkedAccountRole} Mode` : 'Athlete Mode'}
-                        </span>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
                   
                   <DropdownMenuItem onClick={() => navigate(accountType === 'user' ? '/athlete/account' : '/admin/admin-account')}>
                     <User className="mr-2 h-4 w-4" />

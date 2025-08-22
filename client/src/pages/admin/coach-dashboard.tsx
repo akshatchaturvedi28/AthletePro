@@ -181,7 +181,7 @@ export default function CoachDashboard() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => window.location.href = '/admin/account'}>
+              <DropdownMenuItem onClick={() => window.location.href = '/admin/admin-account'}>
                 <User className="h-4 w-4 mr-2" />
                 Account Settings
               </DropdownMenuItem>
