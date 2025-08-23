@@ -6,7 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
+import { EnhancedCalendar, CalendarView, WorkoutStatus } from "@/components/ui/enhanced-calendar";
+import { WorkoutDayModal } from "@/components/workout/workout-day-modal";
 import { Sidebar } from "@/components/layout/sidebar";
 import { WorkoutParser } from "@/components/workout/workout-parser";
 import { WorkoutLog } from "@/components/workout/workout-log";
@@ -21,19 +22,25 @@ import {
   Dumbbell,
   TrendingUp,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Search,
+  MapPin
 } from "lucide-react";
-import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import { format, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isPast } from "date-fns";
 
 export default function AthleteCalendar() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [calendarView, setCalendarView] = useState<CalendarView>('month');
+  const [showDayModal, setShowDayModal] = useState(false);
   const [showWorkoutParser, setShowWorkoutParser] = useState(false);
   const [showWorkoutAssignment, setShowWorkoutAssignment] = useState(false);
   const [showWorkoutClone, setShowWorkoutClone] = useState(false);
   const [showCreateWorkoutOptions, setShowCreateWorkoutOptions] = useState(false);
   const [createWorkoutMode, setCreateWorkoutMode] = useState<'parse' | 'clone'>('parse');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -130,6 +137,110 @@ export default function AthleteCalendar() {
 
   const workoutDates = getWorkoutDates();
   const assignedDates = getAssignedWorkoutDates();
+
+  // Process workouts by date for enhanced calendar
+  const processWorkoutsByDate = (): Record<string, WorkoutStatus> => {
+    const workoutsByDate: Record<string, WorkoutStatus> = {};
+    
+    // Process assigned workouts
+    if (Array.isArray(allAssignedWorkouts)) {
+      allAssignedWorkouts.forEach((assignment: any) => {
+        const dateKey = format(new Date(assignment.assignedDate), 'yyyy-MM-dd');
+        if (!workoutsByDate[dateKey]) {
+          workoutsByDate[dateKey] = {
+            assigned: [],
+            completed: [],
+            status: 'available'
+          };
+        }
+        workoutsByDate[dateKey].assigned.push({
+          id: assignment.id,
+          name: assignment.workout.name,
+          type: assignment.workout.type,
+          description: assignment.workout.description,
+          assignedDate: assignment.assignedDate,
+          completedDate: undefined
+        });
+      });
+    }
+
+    // Process completed workouts
+    if (Array.isArray(workoutLogs)) {
+      workoutLogs.forEach((log: any) => {
+        const dateKey = format(new Date(log.date), 'yyyy-MM-dd');
+        if (!workoutsByDate[dateKey]) {
+          workoutsByDate[dateKey] = {
+            assigned: [],
+            completed: [],
+            status: 'available'
+          };
+        }
+        workoutsByDate[dateKey].completed.push({
+          id: log.id,
+          name: log.workout.name,
+          type: log.workout.type,
+          description: log.workout.description,
+          assignedDate: undefined,
+          completedDate: log.date
+        });
+      });
+    }
+
+    // Determine status for each date
+    Object.keys(workoutsByDate).forEach(dateKey => {
+      const dayData = workoutsByDate[dateKey];
+      const date = new Date(dateKey);
+      
+      if (dayData.completed.length > 0) {
+        dayData.status = 'completed';
+      } else if (dayData.assigned.length > 0) {
+        if (isPast(date)) {
+          dayData.status = 'assigned-missed';
+        } else {
+          dayData.status = 'assigned-future';
+        }
+      } else {
+        dayData.status = 'available';
+      }
+    });
+
+    return workoutsByDate;
+  };
+
+  const workoutsByDate = processWorkoutsByDate();
+
+  // Get workout data for selected date modal
+  const getSelectedDateWorkouts = () => {
+    const assignedWorkouts = Array.isArray(selectedDateAssignments) ? selectedDateAssignments : [];
+    const completedWorkouts = selectedDateLogs;
+
+    return {
+      assigned: assignedWorkouts.map((assignment: any) => ({
+        id: assignment.id,
+        name: assignment.workout.name,
+        type: assignment.workout.type,
+        description: assignment.workout.description,
+        timeCap: assignment.workout.timeCap,
+        assignedDate: assignment.assignedDate,
+        workout: assignment.workout,
+        workoutSource: assignment.workoutSource
+      })),
+      completed: completedWorkouts.map((log: any) => ({
+        id: log.id,
+        name: log.workout.name,
+        type: log.workout.type,
+        description: log.workout.description,
+        finalScore: log.finalScore,
+        humanReadableScore: log.humanReadableScore,
+        notes: log.notes,
+        scaleType: log.scaleType,
+        date: log.date,
+        workout: log.workout
+      }))
+    };
+  };
+
+  const selectedDateWorkoutData = getSelectedDateWorkouts();
 
   const handleWorkoutCreated = (workout: any) => {
     setShowWorkoutParser(false);
@@ -248,153 +359,26 @@ export default function AthleteCalendar() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             {/* Enhanced Calendar */}
-            <Card className="lg:col-span-2 border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
-              <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5 rounded-t-lg p-6">
-                <CardTitle className="flex items-center text-2xl">
-                  <div className="bg-gradient-to-r from-primary to-blue-600 p-3 rounded-xl mr-4 shadow-lg">
-                    <CalendarIcon className="h-6 w-6 text-white" />
-                  </div>
-                  <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent font-bold">
-                    Your Fitness Calendar
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-8">
-                <div className="relative">
-                  <div className="absolute -inset-3 bg-gradient-to-r from-primary/10 to-blue-600/10 rounded-2xl blur opacity-50"></div>
-                  <div className="relative bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-                    <style>{`
-                      .enhanced-calendar .rdp {
-                        --rdp-cell-size: 44px;
-                        --rdp-accent-color: #f97316;
-                        --rdp-background-color: #f97316;
-                        font-size: 0.9rem;
-                      }
-                      
-                      .enhanced-calendar .rdp-months {
-                        justify-content: center;
-                      }
-                      
-                      .enhanced-calendar .rdp-caption {
-                        padding: 1rem 0 1.2rem 0;
-                        text-align: center;
-                        position: relative;
-                      }
-                      
-                      .enhanced-calendar .rdp-caption_label {
-                        font-size: 1.3rem;
-                        font-weight: 700;
-                        color: #1f2937;
-                      }
-                      
-                      .enhanced-calendar .rdp-nav_button {
-                        width: 2rem;
-                        height: 2rem;
-                        border-radius: 0.5rem;
-                        background: linear-gradient(135deg, #f97316, #ea580c);
-                        color: white;
-                        border: none;
-                        cursor: pointer;
-                        transition: all 0.2s ease;
-                      }
-                      
-                      .enhanced-calendar .rdp-nav_button:hover {
-                        background: linear-gradient(135deg, #ea580c, #dc2626);
-                        transform: translateY(-1px);
-                      }
-                      
-                      .enhanced-calendar .rdp-table {
-                        width: 100%;
-                        border-spacing: 2px;
-                      }
-                      
-                      .enhanced-calendar .rdp-head_cell {
-                        padding: 0.5rem 0;
-                        text-align: center;
-                        font-weight: 600;
-                        color: #6b7280;
-                        font-size: 0.75rem;
-                        text-transform: uppercase;
-                        letter-spacing: 0.025em;
-                      }
-                      
-                      .enhanced-calendar .rdp-cell {
-                        text-align: center;
-                        padding: 1px;
-                      }
-                      
-                      .enhanced-calendar .rdp-button {
-                        width: var(--rdp-cell-size);
-                        height: var(--rdp-cell-size);
-                        border-radius: 0.75rem;
-                        border: none;
-                        background: transparent;
-                        color: #374151;
-                        font-weight: 500;
-                        font-size: 0.9rem;
-                        cursor: pointer;
-                        transition: all 0.2s ease;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                      }
-                      
-                      .enhanced-calendar .rdp-button:hover {
-                        background: #f3f4f6;
-                        color: #1f2937;
-                      }
-                      
-                      .enhanced-calendar .rdp-button_selected {
-                        background: linear-gradient(135deg, #f97316, #ea580c) !important;
-                        color: white !important;
-                        font-weight: 700 !important;
-                        box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3) !important;
-                      }
-                      
-                      .enhanced-calendar .rdp-day_outside {
-                        color: #d1d5db;
-                      }
-                      
-                      .enhanced-calendar .rdp-day_today .rdp-button {
-                        background: #fef3c7;
-                        color: #92400e;
-                        font-weight: 600;
-                        border: 2px solid #f59e0b;
-                      }
-                    `}</style>
-                    <div className="enhanced-calendar">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => date && setSelectedDate(date)}
-                        modifiers={{
-                          workout: workoutDates,
-                          assigned: assignedDates
-                        }}
-                        modifiersStyles={{
-                          workout: {
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                            color: 'white',
-                            borderRadius: '0.75rem',
-                            fontWeight: '700',
-                            boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
-                          },
-                          assigned: {
-                            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                            color: 'white',
-                            borderRadius: '0.75rem',
-                            fontWeight: '700',
-                            boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
-                          }
-                        }}
-                        className="rounded-xl border-0 w-full"
-                      />
-                    </div>
-                  </div>
-                </div>
+            <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50">
+              <CardContent className="p-6">
+                <EnhancedCalendar
+                  view={calendarView}
+                  currentDate={currentDate}
+                  selectedDate={selectedDate}
+                  workoutsByDate={workoutsByDate}
+                  onDateSelect={(date: Date) => {
+                    setSelectedDate(date);
+                    setShowDayModal(true);
+                  }}
+                  onNavigate={setCurrentDate}
+                  onViewChange={setCalendarView}
+                  locationFilter={(user as any)?.membership?.community?.name}
+                  searchQuery={searchQuery}
+                />
                 
+                {/* Legend */}
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm">
                   <div className="flex items-center bg-green-50 px-3 py-2 rounded-full border border-green-200">
                     <div className="w-4 h-4 bg-gradient-to-r from-green-500 to-green-600 rounded-full mr-2 shadow-sm"></div>
@@ -402,7 +386,11 @@ export default function AthleteCalendar() {
                   </div>
                   <div className="flex items-center bg-blue-50 px-3 py-2 rounded-full border border-blue-200">
                     <div className="w-4 h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full mr-2 shadow-sm"></div>
-                    <span className="text-blue-700 font-medium">Assigned 📅</span>
+                    <span className="text-blue-700 font-medium">Assigned (Future) 📅</span>
+                  </div>
+                  <div className="flex items-center bg-red-50 px-3 py-2 rounded-full border border-red-200">
+                    <div className="w-4 h-4 bg-gradient-to-r from-red-500 to-red-600 rounded-full mr-2 shadow-sm"></div>
+                    <span className="text-red-700 font-medium">Missed ❌</span>
                   </div>
                   <div className="flex items-center bg-gray-50 px-3 py-2 rounded-full border border-gray-200">
                     <div className="w-4 h-4 bg-gray-300 rounded-full mr-2"></div>
@@ -411,8 +399,22 @@ export default function AthleteCalendar() {
                 </div>
               </CardContent>
             </Card>
+          </div>
 
-            {/* Enhanced Selected Date Details */}
+          {/* Workout Day Modal */}
+          <WorkoutDayModal
+            isOpen={showDayModal}
+            onClose={() => setShowDayModal(false)}
+            date={selectedDate}
+            workouts={selectedDateWorkoutData}
+            onWorkoutLogged={() => {
+              refetchLogs();
+              refetchAssignments();
+            }}
+          />
+
+          <div className="grid grid-cols-1 gap-6 mt-8">
+            {/* Selected Date Details */}
             <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50 overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-primary/5 to-blue-600/5">
                 <CardTitle className="flex items-center text-lg">
@@ -500,6 +502,7 @@ export default function AthleteCalendar() {
                               variant="outline" 
                               size="sm"
                               className="text-blue-600 border-blue-300 hover:bg-blue-100"
+                              onClick={() => setShowDayModal(true)}
                             >
                               View Details
                             </Button>
@@ -515,7 +518,6 @@ export default function AthleteCalendar() {
                       <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                       <p className="text-gray-500 mb-4">No workouts for this date.</p>
                       
-                      {/* Phase 1: Assign Workout Button */}
                       <Button 
                         onClick={() => setShowWorkoutAssignment(true)}
                         className="mb-4"
