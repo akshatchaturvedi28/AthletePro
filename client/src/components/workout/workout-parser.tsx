@@ -10,8 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Zap, Clock, Target, Dumbbell, Edit3, Check, Calendar, Trash2, Plus } from "lucide-react";
+import { Zap, Clock, Target, Dumbbell, Edit3, Check, Trash2 } from "lucide-react";
 
 interface BarbellLift {
   id: number;
@@ -118,6 +117,81 @@ export function WorkoutParser({ onWorkoutsCreated, communityId }: WorkoutParserP
     }
   });
 
+  // Automatic assignment mutation for workouts with extracted dates
+  const assignMutation = useMutation({
+    mutationFn: async ({ workouts, date }: { workouts: any[], date: string }) => {
+      const results = [];
+      const errors = [];
+
+      // Sequential assignment calls
+      for (const workout of workouts) {
+        try {
+          const response = await apiRequest("POST", "/api/workouts/assign-existing", {
+            workoutId: workout.id,
+            workoutSource: workout.source || 'custom_user',
+            assignedDate: date
+          });
+          
+          const result = await response.json();
+          if (result.success) {
+            results.push(result);
+          } else {
+            errors.push(`Failed to assign ${workout.name}: ${result.message}`);
+          }
+        } catch (error) {
+          errors.push(`Failed to assign ${workout.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+
+      return { results, errors };
+    },
+    onSuccess: ({ results, errors }, { date }) => {
+      const successCount = results.length;
+      const errorCount = errors.length;
+      
+      if (successCount > 0 && errorCount === 0) {
+        toast({
+          title: "✅ Workouts Created & Assigned",
+          description: `${successCount} workout${successCount > 1 ? 's' : ''} created and assigned to ${date} successfully.`,
+        });
+      } else if (successCount > 0 && errorCount > 0) {
+        toast({
+          title: "⚠️ Partial Assignment Success",
+          description: `${successCount} workout${successCount > 1 ? 's' : ''} created and assigned, ${errorCount} assignment${errorCount > 1 ? 's' : ''} failed.`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "❌ Assignment Failed",
+          description: "Workouts created but failed to assign to date.",
+          variant: "destructive",
+        });
+      }
+      
+      // Clear form after assignment completion
+      clearAllFormData();
+    },
+    onError: (error) => {
+      toast({
+        title: "💥 Assignment Failed",
+        description: "Workouts created but failed to assign to date.",
+        variant: "destructive",
+      });
+      // Still clear form even if assignment failed
+      clearAllFormData();
+    }
+  });
+
+  const clearAllFormData = () => {
+    console.log('🧹 Clearing all form data');
+    setRawText("");
+    setParsedEntities([]);
+    setExtractedDate(undefined);
+    setIsEditing(false);
+    setParseResult(null);
+    setEditingEntityIndex(null);
+  };
+
   const createMutation = useMutation({
     mutationFn: async (entitiesData: ParsedWorkoutEntity[]) => {
       try {
@@ -158,21 +232,34 @@ export function WorkoutParser({ onWorkoutsCreated, communityId }: WorkoutParserP
         onWorkoutsCreated(createdWorkouts);
       }
       
-      setRawText("");
-      setParsedEntities([]);
-      setExtractedDate(undefined);
-      setIsEditing(false);
-      setParseResult(null);
-      setEditingEntityIndex(null);
+      console.log('🚀 Create Success - Should show dialog?', extractedDate && createdWorkouts.length > 0);
       console.log('Created workouts:', createdWorkouts);
-      
-      toast({
-        title: "✅ Workouts Created",
-        description: `${createdWorkouts.length} workout${createdWorkouts.length > 1 ? 's' : ''} created successfully.`,
-      });
+
+      // Automatic assignment if date is present
+      if (extractedDate && createdWorkouts.length > 0) {
+        console.log('🎯 Auto-assigning workouts to extracted date:', extractedDate);
+        // Prepare workouts for assignment with proper source
+        const workoutsForAssignment = createdWorkouts.map((workout: any) => ({
+          ...workout,
+          source: 'custom_user' // Set default source for custom user workouts
+        }));
+        
+        assignMutation.mutate({ 
+          workouts: workoutsForAssignment, 
+          date: extractedDate 
+        });
+      } else {
+        console.log('🎯 No date assignment - clearing form');
+        toast({
+          title: "✅ Workouts Created",
+          description: `${createdWorkouts.length} workout${createdWorkouts.length > 1 ? 's' : ''} created successfully.`,
+        });
+        // Clear form if no date assignment needed
+        clearAllFormData();
+      }
     },
     onError: (error) => {
-      console.log('Creation failed: ', error);
+      console.log('❌ Creation failed: ', error);
       toast({
         title: "💥 Creation Failed",
         description: "Failed to create workouts. Please try again.",
@@ -259,12 +346,7 @@ export function WorkoutParser({ onWorkoutsCreated, communityId }: WorkoutParserP
   };
 
   const clearAll = () => {
-    setRawText("");
-    setParsedEntities([]);
-    setExtractedDate(undefined);
-    setIsEditing(false);
-    setParseResult(null);
-    setEditingEntityIndex(null);
+    clearAllFormData();
   };
 
   const getCategoryLabel = (category: string) => {
@@ -317,7 +399,7 @@ COOL DOWN:
               className="min-h-[200px]"
             />
             <div className="text-sm text-muted-foreground mt-2">
-              💡 The parser can automatically detect multiple workout sections, dates, and benchmark workouts
+              💡 The parser can automatically detect multiple workout sections, dates, and benchmark workouts. Workouts will be automatically assigned to extracted dates.
             </div>
           </div>
           
@@ -372,8 +454,7 @@ COOL DOWN:
 
                   {extractedDate && (
                     <Badge variant="secondary">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      {extractedDate}
+                      📅 {extractedDate} (Auto-assign enabled)
                     </Badge>
                   )}
                 </div>
@@ -422,17 +503,18 @@ COOL DOWN:
             </h3>
             <Button
               onClick={handleCreateAll}
-              disabled={createMutation.isPending || parsedEntities.length === 0}
+              disabled={createMutation.isPending || assignMutation.isPending || parsedEntities.length === 0}
             >
-              {createMutation.isPending ? (
+              {createMutation.isPending || assignMutation.isPending ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating...
+                  {assignMutation.isPending ? 'Creating & Assigning...' : 'Creating...'}
                 </>
               ) : (
                 <>
                   <Check className="h-4 w-4 mr-2" />
                   Create All {parsedEntities.length} Workout{parsedEntities.length > 1 ? 's' : ''}
+                  {extractedDate && ` & Assign to ${extractedDate}`}
                 </>
               )}
             </Button>

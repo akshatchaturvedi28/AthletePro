@@ -40,6 +40,7 @@ export default function AthleteCalendar() {
   const [showWorkoutClone, setShowWorkoutClone] = useState(false);
   const [showCreateWorkoutOptions, setShowCreateWorkoutOptions] = useState(false);
   const [createWorkoutMode, setCreateWorkoutMode] = useState<'parse' | 'clone'>('parse');
+  const [assignmentMode, setAssignmentMode] = useState<'parse' | 'clone' | 'existing'>('existing');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -266,6 +267,11 @@ export default function AthleteCalendar() {
       title: "Workout Assigned",
       description: "Workout has been assigned to the selected date.",
     });
+    
+    // Reopen day modal after successful assignment (Issue 3 requirement)
+    setTimeout(() => {
+      setShowDayModal(true);
+    }, 200);
   };
 
   const handleWorkoutCloned = (workout: any) => {
@@ -410,6 +416,10 @@ export default function AthleteCalendar() {
             onWorkoutLogged={() => {
               refetchLogs();
               refetchAssignments();
+            }}
+            onAssignWorkout={() => {
+              setAssignmentMode('existing'); // Default to existing for day modal assignments (Issue 3)
+              setShowWorkoutAssignment(true);
             }}
           />
 
@@ -681,7 +691,7 @@ export default function AthleteCalendar() {
             onAssignmentCreated={handleAssignmentCreated}
             isOpen={showWorkoutAssignment}
             onClose={() => setShowWorkoutAssignment(false)}
-            initialTab={createWorkoutMode === 'clone' ? 'clone' : 'parse'}
+            initialTab={assignmentMode}
           />
 
           {/* Workout Clone Modal */}

@@ -35,6 +35,7 @@ export interface WorkoutDayModalProps {
     }>;
   };
   onWorkoutLogged?: () => void;
+  onAssignWorkout?: () => void;
 }
 
 export function WorkoutDayModal({
@@ -42,7 +43,8 @@ export function WorkoutDayModal({
   onClose,
   date,
   workouts,
-  onWorkoutLogged
+  onWorkoutLogged,
+  onAssignWorkout
 }: WorkoutDayModalProps) {
   if (!isOpen) return null;
 
@@ -151,13 +153,28 @@ export function WorkoutDayModal({
           {workouts.assigned.length > 0 && (
             <Card className={`border-blue-200 ${isPastDate ? 'bg-red-50/50' : 'bg-blue-50/50'}`}>
               <CardHeader className="pb-3">
-                <CardTitle className={`flex items-center ${isPastDate ? 'text-red-800' : 'text-blue-800'}`}>
-                  {isPastDate ? (
-                    <AlertCircle className="h-5 w-5 mr-2" />
-                  ) : (
-                    <Target className="h-5 w-5 mr-2" />
+                <CardTitle className={`flex items-center justify-between ${isPastDate ? 'text-red-800' : 'text-blue-800'}`}>
+                  <div className="flex items-center">
+                    {isPastDate ? (
+                      <AlertCircle className="h-5 w-5 mr-2" />
+                    ) : (
+                      <Target className="h-5 w-5 mr-2" />
+                    )}
+                    {isPastDate ? 'Missed Workouts' : 'Assigned Workouts'} ({workouts.assigned.length})
+                  </div>
+                  {!isPastDate && onAssignWorkout && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        onClose();
+                        onAssignWorkout();
+                      }}
+                      className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                    >
+                      Assign Another Workout
+                    </Button>
                   )}
-                  {isPastDate ? 'Missed Workouts' : 'Assigned Workouts'} ({workouts.assigned.length})
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -236,7 +253,15 @@ export function WorkoutDayModal({
                   }
                 </p>
                 {!isPastDate && (
-                  <Button variant="outline" onClick={onClose}>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      onClose();
+                      if (onAssignWorkout) {
+                        onAssignWorkout();
+                      }
+                    }}
+                  >
                     Assign Workout
                   </Button>
                 )}

@@ -334,12 +334,163 @@ export function EnhancedCalendar({
     );
   };
 
+  const renderDayView = () => {
+    const dateKey = format(currentDate, 'yyyy-MM-dd');
+    const dayWorkouts = workoutsByDate[dateKey];
+    const isTodayDate = isToday(currentDate);
+    const isPastDate = isPast(currentDate) && !isTodayDate;
+
+    return (
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <div className="p-6">
+          {/* Day Header */}
+          <div className="text-center mb-8">
+            <div className="text-sm text-gray-500 uppercase tracking-wide mb-2">
+              {format(currentDate, 'EEEE')}
+            </div>
+            <div className={`text-4xl font-bold mb-2 ${isTodayDate ? 'text-blue-600' : 'text-gray-900'}`}>
+              {format(currentDate, 'd')}
+            </div>
+            <div className="text-lg text-gray-600">
+              {format(currentDate, 'MMMM yyyy')}
+            </div>
+            {isTodayDate && (
+              <Badge className="mt-2 bg-blue-500">Today</Badge>
+            )}
+            {isPastDate && (
+              <Badge variant="outline" className="mt-2 text-gray-500">Past Date</Badge>
+            )}
+          </div>
+
+          {/* Workouts for the day */}
+          {dayWorkouts ? (
+            <div className="space-y-6">
+              {/* Completed Workouts */}
+              {dayWorkouts.completed.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-xl font-semibold text-green-700 flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                    Completed Workouts ({dayWorkouts.completed.length})
+                  </h3>
+                  {dayWorkouts.completed.map((workout, idx) => (
+                    <div key={`completed-${idx}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h4 className="text-lg font-semibold text-green-800">{workout.name}</h4>
+                          <Badge variant="default" className="mt-1 bg-green-600">
+                            {workout.type.replace('_', ' ').toUpperCase()}
+                          </Badge>
+                        </div>
+                        <div className="text-green-600 font-medium">✓ Completed</div>
+                      </div>
+                      {workout.description && (
+                        <div className="text-sm text-green-700 bg-green-100 p-3 rounded border">
+                          {workout.description}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Assigned Workouts */}
+              {dayWorkouts.assigned.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className={`text-xl font-semibold flex items-center ${
+                    isPastDate ? 'text-red-700' : 'text-blue-700'
+                  }`}>
+                    <div className={`w-3 h-3 rounded-full mr-2 ${
+                      isPastDate ? 'bg-red-500' : 'bg-blue-500'
+                    }`}></div>
+                    {isPastDate ? 'Missed Workouts' : 'Assigned Workouts'} ({dayWorkouts.assigned.length})
+                  </h3>
+                  {dayWorkouts.assigned.map((workout, idx) => {
+                    const isCompleted = dayWorkouts.completed.some(c => c.id === workout.id);
+                    if (isCompleted) return null; // Don't show if already completed
+
+                    return (
+                      <div key={`assigned-${idx}`} className={`border rounded-lg p-4 ${
+                        isPastDate 
+                          ? 'bg-red-50 border-red-200' 
+                          : 'bg-blue-50 border-blue-200'
+                      }`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <h4 className={`text-lg font-semibold ${
+                              isPastDate ? 'text-red-800' : 'text-blue-800'
+                            }`}>
+                              {workout.name}
+                            </h4>
+                            <Badge variant={isPastDate ? "destructive" : "secondary"} className="mt-1">
+                              {workout.type.replace('_', ' ').toUpperCase()}
+                            </Badge>
+                          </div>
+                          <div className={`font-medium ${
+                            isPastDate ? 'text-red-600' : 'text-blue-600'
+                          }`}>
+                            {isPastDate ? '❌ Missed' : '📅 Assigned'}
+                          </div>
+                        </div>
+                        {workout.description && (
+                          <div className={`text-sm p-3 rounded border ${
+                            isPastDate 
+                              ? 'text-red-700 bg-red-100 border-red-200' 
+                              : 'text-blue-700 bg-blue-100 border-blue-200'
+                          }`}>
+                            {workout.description}
+                          </div>
+                        )}
+                        {isPastDate && (
+                          <div className="mt-3 text-sm text-red-600 bg-red-100 p-2 rounded border border-red-200">
+                            This workout was assigned but not completed on time.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Empty State */
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div className="text-2xl">📅</div>
+              </div>
+              <h3 className="text-lg font-medium text-gray-700 mb-2">
+                No workouts for this day
+              </h3>
+              <p className="text-gray-500">
+                {isPastDate 
+                  ? "No workouts were assigned or completed on this date."
+                  : isTodayDate
+                  ? "No workouts scheduled for today. Time to plan your training!"
+                  : "No workouts currently assigned for this date."
+                }
+              </p>
+              {!isPastDate && (
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => onDateSelect(currentDate)}
+                >
+                  {isTodayDate ? 'Plan Today\'s Workout' : 'Schedule Workout'}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {renderCalendarHeader()}
       
       {view === 'month' && renderMonthView()}
       {view === 'week' && renderWeekView()}
+      {view === 'day' && renderDayView()}
     </div>
   );
 }

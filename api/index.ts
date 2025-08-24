@@ -617,7 +617,7 @@ function splitWODIntoEntitiesEnhanced(input: string): any[] {
         if (hasPreContent) {
           const preContent = preContentLines.join('\n').trim();
           if (preContent) {
-            const preEntityName = extractWorkoutName(preContent) || 'Pre-Section Content';
+            const preEntityName = '';
             entities.push({
               rawText: preContent,
               detectedName: preEntityName,
@@ -822,16 +822,34 @@ function calculateDescriptionSimilarity(input: string, target: string): number {
 }
 
 function parseAsCustomWorkoutEnhanced(entity: any, extractedDate?: string, barbellLifts?: any[]) {
-  const name = entity.detectedName && entity.detectedName !== 'Custom Workout' 
-    ? entity.detectedName 
-    : extractWorkoutName(entity.rawText);
-    
   const workoutDescription = cleanWorkoutDescriptionEnhanced(entity.rawText);
   const workoutType = detectWorkoutTypeEnhanced(entity.rawText.toLowerCase());
   const scoring = workoutType === 'for_time' ? 'Time' : workoutType === 'amrap' ? 'Rounds + Reps' : 'Points';
   const timeCap = extractTimeCap(entity.rawText);
   const totalEffort = calculateTotalEffortEnhanced(entity.rawText);
   const barbellLiftsFound = identifyBarbellLifts(entity.rawText, barbellLifts || []);
+
+    // Enhanced naming with fallback to new pattern
+    let name = entity.detectedName && entity.detectedName !== 'Custom Workout' 
+      ? entity.detectedName 
+      : extractWorkoutName(entity.rawText);
+    
+    // If we still don't have a good name, apply the new default naming pattern
+    if (!name || name === 'Custom Workout' || name.trim() === '' || name === 'Strength') {
+      // Special handling for strength workouts with barbell lifts
+      if (workoutType === 'strength' && barbellLiftsFound?.length > 0) {
+        name = `Strength-${barbellLiftsFound[0].liftName}-CustomWorkout`;
+      }
+      // For strength workouts without barbell lifts
+      else if (workoutType === 'strength') {
+        name = `Strength-CustomWorkout`;
+      }
+      // General pattern: WorkoutType-CustomWorkout
+      else {
+        const formattedType = workoutType.charAt(0).toUpperCase() + workoutType.slice(1).replace('_', '-');
+        name = `${formattedType}-CustomWorkout`;
+      }
+    }
 
   return {
     name,
@@ -871,11 +889,21 @@ function cleanWorkoutDescriptionEnhanced(rawText: string): string {
 }
 
 function detectWorkoutTypeEnhanced(cleanText: string): string {
+  // Check for strength patterns FIRST (before other patterns)
+  if (cleanText.includes('strength:') || 
+      cleanText.includes('build to') || 
+      cleanText.includes('rm') ||
+      cleanText.includes('work up to') ||
+      cleanText.includes('find') ||
+      /\d+\s*x\s*\d+/.test(cleanText) || // 5x3, 3x5 patterns
+      cleanText.includes('sets every')) {
+    return 'strength';
+  }
+  
   if (cleanText.includes('for time') || cleanText.includes('rft')) return 'for_time';
   if (cleanText.includes('amrap')) return 'amrap';
   if (cleanText.includes('emom')) return 'emom';
   if (cleanText.includes('tabata')) return 'tabata';
-  if (cleanText.includes('build to') || cleanText.includes('rm')) return 'strength';
   if (cleanText.includes('max effort')) return 'strength';
   
   return 'for_time';
@@ -916,11 +944,16 @@ function extractWorkoutName(rawText: string): string {
   for (const pattern of namePatterns) {
     const match = rawText.match(pattern);
     if (match && match[1] && match[1].trim().length > 2) {
-      return match[1].trim();
+      const name = match[1].trim();
+      // Don't return generic names
+      if (name.toLowerCase() === 'strength' || name.toLowerCase() === 'workout' || name.toLowerCase() === 'wod') {
+        continue;
+      }
+      return name;
     }
   }
 
-  return 'Custom Workout';
+  return ''; // Return empty string instead of 'Custom Workout' to trigger enhanced naming
 }
 
 function detectWorkoutType(cleanText: string): string {
@@ -975,6 +1008,8 @@ function generateSuggestions(rawText: string, allWorkouts: any[]): string[] {
   
   return suggestions.slice(0, 3);
 }
+
+
 
 // Helper function for category labels (PRD)
 function getCategoryLabel(category: string): string {
